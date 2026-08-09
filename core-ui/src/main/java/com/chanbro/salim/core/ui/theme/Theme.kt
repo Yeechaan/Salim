@@ -8,6 +8,7 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
@@ -16,27 +17,26 @@ private val DarkColorScheme = darkColorScheme(
     tertiary = Pink80
 )
 
+/** 같이살림 브라운 라이트 테마 (Stitch "홈 메인" 시안 기반). */
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
-
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
+    primary = SalimTokens.TextPrimary,
     onPrimary = Color.White,
+    secondary = SalimTokens.Accent,
     onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    background = SalimTokens.Background,
+    onBackground = SalimTokens.TextPrimary,
+    surface = SalimTokens.Background,
+    onSurface = SalimTokens.TextPrimary,
+    surfaceVariant = SalimTokens.CardSurface,
+    onSurfaceVariant = SalimTokens.TextPrimary,
+    outlineVariant = SalimTokens.Divider,
 )
 
 @Composable
 fun SalimTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    // 의도된 브라운 브랜드 컬러를 쓰기 위해 다이내믹 컬러는 기본 off
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
