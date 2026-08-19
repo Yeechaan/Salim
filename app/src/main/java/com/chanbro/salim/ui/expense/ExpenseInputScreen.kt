@@ -51,6 +51,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.chanbro.salim.core.ui.theme.SalimTheme
 import com.chanbro.salim.core.ui.theme.SalimTokens
 import com.chanbro.salim.ui.common.SalimCard
@@ -75,6 +76,7 @@ fun ExpenseInputScreen(
     onClose: () -> Unit,
     onSave: () -> Unit,
     modifier: Modifier = Modifier,
+    viewModel: ExpenseInputViewModel = hiltViewModel(),
 ) {
     var amountDigits by rememberSaveable { mutableStateOf("") }
     var spender by rememberSaveable { mutableStateOf(spenders.first()) }
@@ -129,7 +131,21 @@ fun ExpenseInputScreen(
             }
         }
 
-        SaveButton(enabled = canSave, onClick = onSave)
+        SaveButton(
+            enabled = canSave,
+            onClick = {
+                viewModel.save(
+                    amount = amountDigits.toLongOrNull() ?: 0L,
+                    spenderLabel = spender,
+                    categoryName = category,
+                    memo = memo,
+                    dateUtcMillis = dateMillis,
+                    hour24 = hour,
+                    minute = minute,
+                    onDone = onSave,
+                )
+            },
+        )
     }
 
     if (showDatePicker) {
