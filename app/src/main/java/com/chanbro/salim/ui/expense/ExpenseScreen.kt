@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -104,10 +105,7 @@ fun ExpenseScreen(
     var showMonthPicker by rememberSaveable { mutableStateOf(false) }
 
     Column(modifier = modifier.fillMaxSize()) {
-        ExpenseTopBar(
-            monthLabel = "${year}년 ${month}월",
-            onMonthClick = { showMonthPicker = true },
-        )
+        ExpenseTopBar()
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -115,6 +113,10 @@ fun ExpenseScreen(
                 .padding(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
+            MonthSelector(
+                label = "${year}년 ${month}월",
+                onClick = { showMonthPicker = true },
+            )
             MonthTotalCard(state.monthTotal)
             if (state.groups.isEmpty()) {
                 EmptyState()
@@ -141,23 +143,25 @@ fun ExpenseScreen(
 }
 
 @Composable
-private fun ExpenseTopBar(monthLabel: String, onMonthClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .statusBarsPadding()
-            .padding(start = 16.dp, end = 12.dp, top = 4.dp)
-            .height(56.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        MonthSelector(label = monthLabel, onClick = onMonthClick)
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            IconButton(onClick = { /* TODO: 검색 패널 */ }) {
-                Icon(Icons.Filled.Search, contentDescription = "검색", tint = SalimTokens.TextPrimary)
-            }
-            IconButton(onClick = { /* TODO: 필터 패널 */ }) {
-                Icon(Icons.Filled.Tune, contentDescription = "필터", tint = SalimTokens.TextPrimary)
+private fun ExpenseTopBar() {
+    Surface(color = SalimTokens.Background) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .height(60.dp)
+                .padding(start = 20.dp, end = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("가계부", style = SalimType.headlineSm, color = SalimTokens.TextPrimary)
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                IconButton(onClick = { /* TODO: 검색 패널 */ }) {
+                    Icon(Icons.Filled.Search, contentDescription = "검색", tint = SalimTokens.TextPrimary)
+                }
+                IconButton(onClick = { /* TODO: 필터 패널 */ }) {
+                    Icon(Icons.Filled.Tune, contentDescription = "필터", tint = SalimTokens.TextPrimary)
+                }
             }
         }
     }

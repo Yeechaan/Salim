@@ -203,12 +203,12 @@ private fun MonthCell(
 // 하단 탭 내비게이션 (전 화면 공통) — design.md 하단 탭바
 // ---------------------------------------------------------------------------
 
-enum class SalimTab(val label: String, val icon: ImageVector) {
-    Home("홈", Icons.Filled.Home),
-    Expense("가계부", Icons.Filled.AccountBalanceWallet),
-    Schedule("일정", Icons.Filled.CalendarToday),
-    DDay("디데이", Icons.Filled.CardGiftcard),
-    Settings("설정", Icons.Filled.Settings),
+enum class SalimTab(val label: String, val icon: ImageVector, val route: String) {
+    Home("홈", Icons.Filled.Home, "home"),
+    Expense("가계부", Icons.Filled.AccountBalanceWallet, "expense"),
+    Schedule("일정", Icons.Filled.CalendarToday, "schedule"),
+    DDay("디데이", Icons.Filled.CardGiftcard, "dday"),
+    Settings("설정", Icons.Filled.Settings, "settings"),
 }
 
 @Composable
@@ -248,8 +248,43 @@ fun SalimBottomBar(selected: SalimTab, onSelect: (SalimTab) -> Unit) {
 }
 
 // ---------------------------------------------------------------------------
+// 칩 (design.md: pill 형태. 선택 = Coral 배경+흰 텍스트, 미선택 = Primary Soft 배경+Coral 텍스트)
+// 쓰임: 지출자/카테고리 선택, 일정 유형 필터 등
+// ---------------------------------------------------------------------------
+
+@Composable
+fun SalimChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(percent = 50))
+            .background(if (selected) SalimTokens.Accent else SalimTokens.AccentSoft)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 18.dp, vertical = 10.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            label,
+            style = SalimType.bodyMd.copy(fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium),
+            color = if (selected) Color.White else SalimTokens.Accent,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
 // 유틸
 // ---------------------------------------------------------------------------
 
 fun parseAmount(text: String): Long =
     text.filter { it.isDigit() }.toLongOrNull() ?: 0L
+
+/** 숫자 문자열(예: "12000")을 천단위 콤마 포맷("12,000")으로. 빈 값이면 "". */
+fun formatThousands(digits: String): String {
+    val n = digits.filter { it.isDigit() }.trimStart('0')
+    if (n.isEmpty()) return ""
+    return n.reversed().chunked(3).joinToString(",").reversed()
+}

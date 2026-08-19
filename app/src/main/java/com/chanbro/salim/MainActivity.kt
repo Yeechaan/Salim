@@ -4,6 +4,9 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,18 +19,24 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
 import com.chanbro.salim.core.ui.theme.SalimTheme
 import com.chanbro.salim.core.ui.theme.SalimTokens
 import com.chanbro.salim.ui.common.SalimBottomBar
 import com.chanbro.salim.ui.common.SalimTab
 import com.chanbro.salim.ui.common.SalimType
+import com.chanbro.salim.ui.expense.ExpenseInputScreen
 import com.chanbro.salim.ui.expense.ExpenseScreen
 import com.chanbro.salim.ui.home.HomeScreen
+
+private const val ROUTE_EXPENSE_INPUT = "expense_input"
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -43,33 +52,70 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun SalimApp() {
-    var tab by rememberSaveable { mutableStateOf(SalimTab.Home) }
+    val navController = rememberNavController()
+    val backStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = backStackEntry?.destination?.route
+
+    val tabRoutes = SalimTab.entries.map { it.route }.toSet()
+    val onTabRoute = currentRoute in tabRoutes
+    val selectedTab = SalimTab.entries.firstOrNull { it.route == currentRoute } ?: SalimTab.Home
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = SalimTokens.Background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        bottomBar = { SalimBottomBar(selected = tab, onSelect = { tab = it }) },
+        bottomBar = {
+            AnimatedVisibility(
+                visible = onTabRoute,
+                enter = slideInVertically { it },
+                exit = slideOutVertically { it },
+            ) {
+                SalimBottomBar(
+                    selected = selectedTab,
+                    onSelect = { tab -> navController.navigateToTab(tab) },
+                )
+            }
+        },
         floatingActionButton = {
             // FAB 노출 규칙(main-shell.md): 가계부/일정/디데이. 지금은 가계부만 실제 화면.
-            if (tab == SalimTab.Expense) {
+            if (currentRoute == SalimTab.Expense.route) {
                 FloatingActionButton(
-                    onClick = { /* TODO: 지출 입력 화면 연결 (4-2) */ },
+                    onClick = { navController.navigate(ROUTE_EXPENSE_INPUT) },
                     containerColor = SalimTokens.Accent,
-                    contentColor = androidx.compose.ui.graphics.Color.White,
+                    contentColor = Color.White,
                 ) {
                     Icon(Icons.Filled.Add, contentDescription = "지출 추가")
                 }
             }
         },
     ) { innerPadding ->
-        Box(modifier = Modifier.padding(innerPadding)) {
-            when (tab) {
-                SalimTab.Home -> HomeScreen()
-                SalimTab.Expense -> ExpenseScreen()
-                else -> PlaceholderScreen(tab.label)
+        NavHost(
+            navController = navController,
+            startDestination = SalimTab.Home.route,
+            modifier = Modifier.padding(innerPadding),
+        ) {
+            composable(SalimTab.Home.route) { HomeScreen() }
+            composable(SalimTab.Expense.route) {
+                ExpenseScreen(onItemClick = { navController.navigate(ROUTE_EXPENSE_INPUT) })
+            }
+            composable(SalimTab.Schedule.route) { PlaceholderScreen(SalimTab.Schedule.label) }
+            composable(SalimTab.DDay.route) { PlaceholderScreen(SalimTab.DDay.label) }
+            composable(SalimTab.Settings.route) { PlaceholderScreen(SalimTab.Settings.label) }
+            composable(ROUTE_EXPENSE_INPUT) {
+                ExpenseInputScreen(
+                    onClose = { navController.popBackStack() },
+                    onSave = { navController.popBackStack() },
+                )
             }
         }
+    }
+}
+
+private fun androidx.navigation.NavHostController.navigateToTab(tab: SalimTab) {
+    navigate(tab.route) {
+        popUpTo(graph.findStartDestination().id) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
     }
 }
 
