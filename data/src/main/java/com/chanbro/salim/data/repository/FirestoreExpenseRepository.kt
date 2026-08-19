@@ -39,7 +39,6 @@ class FirestoreExpenseRepository @Inject constructor(
             .whereGreaterThanOrEqualTo("spentAtMillis", startMillis)
             .whereLessThan("spentAtMillis", endMillis)
             .orderBy("spentAtMillis", Query.Direction.DESCENDING)
-            .orderBy("createdAtMillis", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     close(error)
