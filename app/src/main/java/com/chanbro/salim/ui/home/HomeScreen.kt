@@ -2,6 +2,7 @@ package com.chanbro.salim.ui.home
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,15 +25,26 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CardGiftcard
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -64,7 +76,8 @@ data class DDayItem(val title: String, val date: String, val dDay: String)
 data class Transaction(val title: String, val subtitle: String, val amount: String)
 
 data class HomeUiState(
-    val month: String = "2026년 8월",
+    val year: Int = 2026,
+    val month: Int = 8,
     val budgetSpent: String = "842,000원",
     val budgetTotal: String = "1,200,000원",
     val budgetRemainText: String = "남은 예산 358,000원",
@@ -111,6 +124,10 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     state: HomeUiState = HomeUiState(),
 ) {
+    var year by rememberSaveable { mutableIntStateOf(state.year) }
+    var month by rememberSaveable { mutableIntStateOf(state.month) }
+    var showMonthPicker by rememberSaveable { mutableStateOf(false) }
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = SalimTokens.Background,
@@ -126,12 +143,28 @@ fun HomeScreen(
                 .padding(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
-            MonthSelector(state.month)
+            MonthSelector(
+                label = "${year}년 ${month}월",
+                onClick = { showMonthPicker = true },
+            )
             BudgetCard(state)
             CategoryCard(state.categories)
             UpcomingDDayCard(state.dDays)
             RecentTransactionsCard(state.recent)
         }
+    }
+
+    if (showMonthPicker) {
+        MonthPickerSheet(
+            year = year,
+            month = month,
+            onDismiss = { showMonthPicker = false },
+            onSelect = { selectedYear, selectedMonth ->
+                year = selectedYear
+                month = selectedMonth
+                showMonthPicker = false
+            },
+        )
     }
 }
 
@@ -162,12 +195,16 @@ private fun HomeTopBar() {
 }
 
 @Composable
-private fun MonthSelector(month: String) {
+private fun MonthSelector(label: String, onClick: () -> Unit) {
     Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp, horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Text(month, style = HomeType.display, color = SalimTokens.TextPrimary)
+        Text(label, style = HomeType.display, color = SalimTokens.TextPrimary)
         Icon(
             Icons.Filled.KeyboardArrowDown,
             contentDescription = "월 선택",
@@ -414,6 +451,92 @@ private fun HomeBottomBar() {
 }
 
 private data class BottomItem(val label: String, val icon: ImageVector, val selected: Boolean)
+
+// ---------------------------------------------------------------------------
+// 월 선택 바텀시트 (home.md 3-1: 상단 월 탭 시 다른 월로 이동)
+// ---------------------------------------------------------------------------
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MonthPickerSheet(
+    year: Int,
+    month: Int,
+    onDismiss: () -> Unit,
+    onSelect: (year: Int, month: Int) -> Unit,
+) {
+    var pickerYear by rememberSaveable { mutableIntStateOf(year) }
+    val sheetState = rememberModalBottomSheetState()
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = SalimTokens.CardSurface,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            // 연도 이동
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = { pickerYear-- }) {
+                    Icon(Icons.Filled.ChevronLeft, contentDescription = "이전 해", tint = SalimTokens.TextPrimary)
+                }
+                Text("${pickerYear}년", style = HomeType.titleLg, color = SalimTokens.TextPrimary)
+                IconButton(onClick = { pickerYear++ }) {
+                    Icon(Icons.Filled.ChevronRight, contentDescription = "다음 해", tint = SalimTokens.TextPrimary)
+                }
+            }
+            // 월 그리드 (3열 × 4행)
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                for (row in 0 until 4) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        for (col in 0 until 3) {
+                            val m = row * 3 + col + 1
+                            MonthCell(
+                                label = "${m}월",
+                                selected = pickerYear == year && m == month,
+                                modifier = Modifier.weight(1f),
+                                onClick = { onSelect(pickerYear, m) },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MonthCell(
+    label: String,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(if (selected) SalimTokens.Accent else SalimTokens.ProgressTrack)
+            .clickable(onClick = onClick)
+            .padding(vertical = 14.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            label,
+            style = HomeType.bodyLg.copy(fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal),
+            color = if (selected) Color.White else SalimTokens.TextPrimary,
+        )
+    }
+}
 
 // ---------------------------------------------------------------------------
 // 공용 카드 (design.md: 흰 배경 + 라디우스 + 소프트 확산 그림자, 하드 보더 지양)
