@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 개발용: 모든 사용자에게 읽기/쓰기 허용
+    // TODO: 프로덕션 배포 전 인증 규칙 추가
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

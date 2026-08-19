@@ -1,9 +1,11 @@
 package com.chanbro.salim.di
 
-import com.chanbro.salim.data.repository.InMemoryExpenseRepository
+import com.chanbro.salim.data.repository.FirestoreExpenseRepository
 import com.chanbro.salim.domain.repository.ExpenseRepository
+import com.google.firebase.firestore.FirebaseFirestore
 import dagger.Binds
 import dagger.Module
+import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
@@ -14,5 +16,11 @@ abstract class RepositoryModule {
 
     @Binds
     @Singleton
-    abstract fun bindExpenseRepository(impl: InMemoryExpenseRepository): ExpenseRepository
+    abstract fun bindExpenseRepository(impl: FirestoreExpenseRepository): ExpenseRepository
+
+    companion object {
+        @Provides
+        @Singleton
+        fun provideFirebaseFirestore(): FirebaseFirestore = FirebaseFirestore.getInstance()
+    }
 }

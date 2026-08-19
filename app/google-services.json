@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "75512930205",
+    "project_id": "salim-9ce36",
+    "storage_bucket": "salim-9ce36.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:75512930205:android:a9a72d960ab165984f5974",
+        "android_client_info": {
+          "package_name": "com.chanbro.salim"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCmeQGx3Zxr76NBNr6WmJECy_AMSbHPGlE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
