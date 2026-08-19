@@ -19,13 +19,23 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -47,6 +57,11 @@ import com.chanbro.salim.ui.common.SalimCard
 import com.chanbro.salim.ui.common.SalimChip
 import com.chanbro.salim.ui.common.SalimType
 import com.chanbro.salim.ui.common.formatThousands
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 
 private val spenders = listOf("나", "배우자")
 private val quickCategories = listOf("식비", "카페", "교통", "문화/여가", "생활")
@@ -65,6 +80,11 @@ fun ExpenseInputScreen(
     var spender by rememberSaveable { mutableStateOf(spenders.first()) }
     var category by rememberSaveable { mutableStateOf(quickCategories.first()) }
     var memo by rememberSaveable { mutableStateOf("") }
+    var dateMillis by rememberSaveable { mutableLongStateOf(todayUtcMillis()) }
+    var hour by rememberSaveable { mutableIntStateOf(nowHour()) }
+    var minute by rememberSaveable { mutableIntStateOf(nowMinute()) }
+    var showDatePicker by rememberSaveable { mutableStateOf(false) }
+    var showTimePicker by rememberSaveable { mutableStateOf(false) }
 
     val canSave = amountDigits.isNotEmpty()
 
@@ -89,9 +109,9 @@ fun ExpenseInputScreen(
             )
 
             SalimCard(cornerRadius = 20.dp) {
-                FieldRow(label = "날짜", value = "2026년 8월 19일", onClick = { /* TODO 날짜 선택 */ })
+                FieldRow(label = "날짜", value = formatDate(dateMillis), onClick = { showDatePicker = true })
                 FieldDivider()
-                FieldRow(label = "시간", value = "오후 2:30", onClick = { /* TODO 시간 선택 */ })
+                FieldRow(label = "시간", value = formatTime(hour, minute), onClick = { showTimePicker = true })
                 FieldDivider()
                 ChipsField(
                     label = "지출자",
@@ -110,6 +130,22 @@ fun ExpenseInputScreen(
         }
 
         SaveButton(enabled = canSave, onClick = onSave)
+    }
+
+    if (showDatePicker) {
+        DatePickerModal(
+            initialMillis = dateMillis,
+            onConfirm = { dateMillis = it; showDatePicker = false },
+            onDismiss = { showDatePicker = false },
+        )
+    }
+    if (showTimePicker) {
+        TimePickerModal(
+            initialHour = hour,
+            initialMinute = minute,
+            onConfirm = { h, m -> hour = h; minute = m; showTimePicker = false },
+            onDismiss = { showTimePicker = false },
+        )
     }
 }
 
@@ -284,6 +320,84 @@ private fun SaveButton(enabled: Boolean, onClick: () -> Unit) {
             Text("저장하기", style = SalimType.bodyLg.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold))
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// 날짜 / 시간 피커 (Material3)
+// ---------------------------------------------------------------------------
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DatePickerModal(
+    initialMillis: Long,
+    onConfirm: (Long) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val state = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = { state.selectedDateMillis?.let(onConfirm) ?: onDismiss() }) {
+                Text("확인", color = SalimTokens.Accent)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("취소", color = SalimTokens.TextMuted) }
+        },
+    ) {
+        DatePicker(state = state)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TimePickerModal(
+    initialHour: Int,
+    initialMinute: Int,
+    onConfirm: (Int, Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val state = rememberTimePickerState(initialHour = initialHour, initialMinute = initialMinute, is24Hour = false)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = { onConfirm(state.hour, state.minute) }) {
+                Text("확인", color = SalimTokens.Accent)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("취소", color = SalimTokens.TextMuted) }
+        },
+        text = {
+            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                TimePicker(state = state)
+            }
+        },
+        containerColor = SalimTokens.CardSurface,
+    )
+}
+
+// UTC 자정 기준(Material3 DatePicker 규약)으로 오늘 날짜의 millis.
+private fun todayUtcMillis(): Long {
+    val local = Calendar.getInstance()
+    return Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
+        clear()
+        set(local.get(Calendar.YEAR), local.get(Calendar.MONTH), local.get(Calendar.DAY_OF_MONTH))
+    }.timeInMillis
+}
+
+private fun nowHour(): Int = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+private fun nowMinute(): Int = Calendar.getInstance().get(Calendar.MINUTE)
+
+private fun formatDate(utcMillis: Long): String =
+    SimpleDateFormat("yyyy년 M월 d일", Locale.KOREAN).apply {
+        timeZone = TimeZone.getTimeZone("UTC")
+    }.format(Date(utcMillis))
+
+private fun formatTime(hour24: Int, minute: Int): String {
+    val ampm = if (hour24 < 12) "오전" else "오후"
+    val h12 = (hour24 % 12).let { if (it == 0) 12 else it }
+    return "$ampm $h12:${minute.toString().padStart(2, '0')}"
 }
 
 // ---------------------------------------------------------------------------
