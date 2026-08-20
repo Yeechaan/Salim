@@ -20,6 +20,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -41,10 +44,19 @@ import com.chanbro.salim.ui.dday.DDayScreen
 import com.chanbro.salim.ui.expense.ExpenseInputScreen
 import com.chanbro.salim.ui.expense.ExpenseScreen
 import com.chanbro.salim.ui.home.HomeScreen
+import com.chanbro.salim.ui.schedule.ScheduleInputScreen
+import com.chanbro.salim.ui.schedule.ScheduleScreen
+import com.chanbro.salim.ui.schedule.todayUtc
 
 private const val ROUTE_EXPENSE_INPUT = "expense_input"
 private const val ROUTE_DDAY_INPUT = "dday_input"
 private const val ROUTE_DDAY_EDIT = "dday_edit/{ddayId}"
+private const val ROUTE_SCHEDULE_INPUT = "schedule_input/{dateMillis}"
+private const val ROUTE_SCHEDULE_EDIT = "schedule_edit/{scheduleId}"
+
+private fun scheduleInputRoute(dateMillis: Long): String = "schedule_input/$dateMillis"
+private fun scheduleEditRoute(scheduleId: String): String =
+    "schedule_edit/${Uri.encode(scheduleId)}"
 
 private fun ddayEditRoute(ddayId: String): String = "dday_edit/${Uri.encode(ddayId)}"
 
@@ -67,6 +79,9 @@ private fun SalimApp() {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
 
+    // 일정 FAB가 캘린더에서 선택 중인 날짜를 기본값으로 넘기기 위해 끌어올린 상태.
+    var selectedScheduleDate by rememberSaveable { mutableLongStateOf(todayUtc()) }
+
     val tabRoutes = SalimTab.entries.map { it.route }.toSet()
     val onTabRoute = currentRoute in tabRoutes
     val selectedTab = SalimTab.entries.firstOrNull { it.route == currentRoute } ?: SalimTab.Home
@@ -88,7 +103,7 @@ private fun SalimApp() {
             }
         },
         floatingActionButton = {
-            // FAB 노출 규칙(main-shell.md): 가계부/일정/디데이. 일정은 아직 플레이스홀더.
+            // FAB 노출 규칙(main-shell.md): 가계부/일정/디데이
             when (currentRoute) {
                 SalimTab.Expense.route -> {
                     FloatingActionButton(
@@ -97,6 +112,15 @@ private fun SalimApp() {
                         contentColor = Color.White,
                     ) {
                         Icon(Icons.Filled.Add, contentDescription = "지출 추가")
+                    }
+                }
+                SalimTab.Schedule.route -> {
+                    FloatingActionButton(
+                        onClick = { navController.navigate(scheduleInputRoute(selectedScheduleDate)) },
+                        containerColor = SalimTokens.Accent,
+                        contentColor = Color.White,
+                    ) {
+                        Icon(Icons.Filled.Add, contentDescription = "일정 등록")
                     }
                 }
                 SalimTab.DDay.route -> {
@@ -120,7 +144,12 @@ private fun SalimApp() {
             composable(SalimTab.Expense.route) {
                 ExpenseScreen(onItemClick = { navController.navigate(ROUTE_EXPENSE_INPUT) })
             }
-            composable(SalimTab.Schedule.route) { PlaceholderScreen(SalimTab.Schedule.label) }
+            composable(SalimTab.Schedule.route) {
+                ScheduleScreen(
+                    onItemClick = { row -> navController.navigate(scheduleEditRoute(row.id)) },
+                    onSelectedDateChange = { selectedScheduleDate = it },
+                )
+            }
             composable(SalimTab.DDay.route) {
                 DDayScreen(
                     onItemClick = { row ->
@@ -145,6 +174,26 @@ private fun SalimApp() {
                     onClose = { navController.popBackStack() },
                     onDone = { navController.popBackStack() },
                     ddayId = entry.arguments?.getString("ddayId"),
+                )
+            }
+            composable(
+                ROUTE_SCHEDULE_INPUT,
+                arguments = listOf(navArgument("dateMillis") { type = NavType.LongType }),
+            ) { entry ->
+                ScheduleInputScreen(
+                    onClose = { navController.popBackStack() },
+                    onDone = { navController.popBackStack() },
+                    defaultDateMillis = entry.arguments?.getLong("dateMillis") ?: todayUtc(),
+                )
+            }
+            composable(
+                ROUTE_SCHEDULE_EDIT,
+                arguments = listOf(navArgument("scheduleId") { type = NavType.StringType }),
+            ) { entry ->
+                ScheduleInputScreen(
+                    onClose = { navController.popBackStack() },
+                    onDone = { navController.popBackStack() },
+                    scheduleId = entry.arguments?.getString("scheduleId"),
                 )
             }
             composable(ROUTE_EXPENSE_INPUT) {

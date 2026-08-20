@@ -54,11 +54,18 @@
 ### couples/{coupleId}/schedules/{scheduleId}
 일정. (PRD 5. 일정)
 
-| 필드 | 설명 |
-|---|---|
-| title | 제목 |
-| date / time | 일시 |
-| type | 우리 일정 / 개인(나) / 개인(배우자) |
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| title | String | 제목 |
+| dateMillis | Number | 날짜 (UTC 자정 millis) |
+| minuteOfDay | Number? | 시작 시각(0~1439). **없으면 종일 일정** |
+| type | String | SHARED(우리) / MINE(개인-나) / PARTNER(개인-배우자) |
+| createdAtMillis | Number | 등록 시각 |
+
+- 캘린더가 월 단위로 그려지므로 조회도 월 단위(`dateMillis` 범위 쿼리 + 오름차순)로 한다.
+- 날짜와 시각을 한 값으로 합치지 않고 분리한다 — 종일 여부를 `minuteOfDay` 유무로만 표현할 수 있고, 날짜 그룹핑도 추가 계산 없이 된다.
+- 반복 일정은 1차 범위에서 제외 (wireframe/schedule.md 5-2).
+- 현재 구현은 다른 기능과 동일하게 시뮬레이션 경로 `users/demo/schedules`를 사용한다.
 
 ### {budget}/{yyyy-MM}
 월 예산. (PRD 3. 홈 "이번 달 예산") — `users/{userId}/budget` / `couples/{coupleId}/budget` **공통 필드 스키마**.
