@@ -17,11 +17,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.DirectionsBus
 import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.LocalCafe
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -47,9 +53,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -400,6 +410,55 @@ fun formatDate(utcMillis: Long): String =
     SimpleDateFormat("yyyy년 M월 d일", Locale.KOREAN).apply {
         timeZone = TimeZone.getTimeZone("UTC")
     }.format(Date(utcMillis))
+
+// ---------------------------------------------------------------------------
+// 카테고리 → 아이콘/색 (표시 전용 매핑) — 가계부 리스트, 홈 카테고리 차트 공용
+// TODO: 설정 > 카테고리 수정(PRD 7)이 생기면 categories 문서의 icon 키로 대체
+// ---------------------------------------------------------------------------
+
+fun categoryVisual(name: String): Pair<ImageVector, Color> = when (name) {
+    "식비" -> Icons.Filled.Restaurant to SalimTokens.CatFood
+    "카페" -> Icons.Filled.LocalCafe to SalimTokens.Sage
+    "교통" -> Icons.Filled.DirectionsBus to SalimTokens.CatTransport
+    "문화/여가" -> Icons.Filled.Movie to SalimTokens.CatCulture
+    "생활" -> Icons.Filled.ShoppingBag to SalimTokens.Accent
+    else -> Icons.Filled.Receipt to SalimTokens.Lavender
+}
+
+// ---------------------------------------------------------------------------
+// 금액 입력 천단위 콤마 VisualTransformation — 지출 입력 / 예산 설정 공용
+// ---------------------------------------------------------------------------
+
+val ThousandsTransformation = object : VisualTransformation {
+    override fun filter(text: AnnotatedString): TransformedText {
+        val digits = text.text
+        val formatted = formatThousands(digits)
+        val mapping = object : OffsetMapping {
+            override fun originalToTransformed(offset: Int): Int {
+                if (offset <= 0) return 0
+                var seen = 0
+                for (i in formatted.indices) {
+                    if (formatted[i] != ',') {
+                        seen++
+                        if (seen == offset) return i + 1
+                    }
+                }
+                return formatted.length
+            }
+
+            override fun transformedToOriginal(offset: Int): Int {
+                var seen = 0
+                var i = 0
+                while (i < offset && i < formatted.length) {
+                    if (formatted[i] != ',') seen++
+                    i++
+                }
+                return seen
+            }
+        }
+        return TransformedText(AnnotatedString(formatted), mapping)
+    }
+}
 
 // ---------------------------------------------------------------------------
 // 유틸

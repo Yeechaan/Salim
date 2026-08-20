@@ -48,19 +48,7 @@ import com.chanbro.salim.ui.common.MonthPickerSheet
 import com.chanbro.salim.ui.common.MonthSelector
 import com.chanbro.salim.ui.common.SalimCard
 import com.chanbro.salim.ui.common.SalimType
-
-// ---------------------------------------------------------------------------
-// 카테고리 → 아이콘/색 (표시 전용 매핑)
-// ---------------------------------------------------------------------------
-
-private fun categoryVisual(name: String): Pair<ImageVector, Color> = when (name) {
-    "식비" -> Icons.Filled.Restaurant to SalimTokens.CatFood
-    "카페" -> Icons.Filled.LocalCafe to SalimTokens.Sage
-    "교통" -> Icons.Filled.DirectionsBus to SalimTokens.CatTransport
-    "문화/여가" -> Icons.Filled.Movie to SalimTokens.CatCulture
-    "생활" -> Icons.Filled.ShoppingBag to SalimTokens.Accent
-    else -> Icons.Filled.Receipt to SalimTokens.Lavender
-}
+import com.chanbro.salim.ui.common.categoryVisual
 
 // ---------------------------------------------------------------------------
 // 화면 (하단 탭바/FAB는 상위 Scaffold가 제공, 여기서는 콘텐츠만)
