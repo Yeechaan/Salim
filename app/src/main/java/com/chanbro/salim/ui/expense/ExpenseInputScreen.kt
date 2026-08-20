@@ -17,14 +17,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TimePicker
-import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -47,6 +42,7 @@ import com.chanbro.salim.ui.common.DatePickerModal
 import com.chanbro.salim.ui.common.FieldDivider
 import com.chanbro.salim.ui.common.FieldRow
 import com.chanbro.salim.ui.common.SalimCard
+import com.chanbro.salim.ui.common.TimePickerModal
 import com.chanbro.salim.ui.common.SalimChip
 import com.chanbro.salim.ui.common.SalimType
 import com.chanbro.salim.ui.common.SaveButton
@@ -281,34 +277,6 @@ private fun MemoField(memo: String, onMemoChange: (String) -> Unit) {
 // ---------------------------------------------------------------------------
 // 날짜 / 시간 피커 (Material3)
 // ---------------------------------------------------------------------------
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun TimePickerModal(
-    initialHour: Int,
-    initialMinute: Int,
-    onConfirm: (Int, Int) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val state = rememberTimePickerState(initialHour = initialHour, initialMinute = initialMinute, is24Hour = false)
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            TextButton(onClick = { onConfirm(state.hour, state.minute) }) {
-                Text("확인", color = SalimTokens.Accent)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("취소", color = SalimTokens.TextMuted) }
-        },
-        text = {
-            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                TimePicker(state = state)
-            }
-        },
-        containerColor = SalimTokens.CardSurface,
-    )
-}
 
 private fun nowHour(): Int = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
 private fun nowMinute(): Int = Calendar.getInstance().get(Calendar.MINUTE)
