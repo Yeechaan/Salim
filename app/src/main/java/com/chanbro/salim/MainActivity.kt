@@ -36,7 +36,6 @@ import com.chanbro.salim.core.ui.theme.SalimTokens
 import com.chanbro.salim.ui.common.SalimBottomBar
 import com.chanbro.salim.ui.common.SalimTab
 import com.chanbro.salim.ui.common.SalimType
-import com.chanbro.salim.ui.dday.DDayEntry
 import com.chanbro.salim.ui.dday.DDayInputScreen
 import com.chanbro.salim.ui.dday.DDayScreen
 import com.chanbro.salim.ui.expense.ExpenseInputScreen
@@ -45,11 +44,9 @@ import com.chanbro.salim.ui.home.HomeScreen
 
 private const val ROUTE_EXPENSE_INPUT = "expense_input"
 private const val ROUTE_DDAY_INPUT = "dday_input"
-private const val ROUTE_DDAY_EDIT = "dday_edit/{title}/{date}/{repeat}"
+private const val ROUTE_DDAY_EDIT = "dday_edit/{ddayId}"
 
-// TODO: 데이터 계층 도입 후 ddayId만 넘기도록 교체
-private fun ddayEditRoute(entry: DDayEntry): String =
-    "dday_edit/${Uri.encode(entry.title)}/${entry.dateMillis}/${entry.repeatYearly}"
+private fun ddayEditRoute(ddayId: String): String = "dday_edit/${Uri.encode(ddayId)}"
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -126,10 +123,10 @@ private fun SalimApp() {
             composable(SalimTab.Schedule.route) { PlaceholderScreen(SalimTab.Schedule.label) }
             composable(SalimTab.DDay.route) {
                 DDayScreen(
-                    onItemClick = { entry ->
+                    onItemClick = { row ->
                         // 자동 반영 항목(생일/기념일)은 설정 > 프로필에서만 수정 (PRD 6.)
                         // TODO: 자동 항목 탭 시 안내/프로필 이동 흐름 확정 필요 (dday.md 6-1)
-                        if (!entry.isAuto) navController.navigate(ddayEditRoute(entry))
+                        if (!row.isAuto) navController.navigate(ddayEditRoute(row.id))
                     },
                 )
             }
@@ -137,27 +134,17 @@ private fun SalimApp() {
             composable(ROUTE_DDAY_INPUT) {
                 DDayInputScreen(
                     onClose = { navController.popBackStack() },
-                    onSave = { navController.popBackStack() },
+                    onDone = { navController.popBackStack() },
                 )
             }
             composable(
                 ROUTE_DDAY_EDIT,
-                arguments = listOf(
-                    navArgument("title") { type = NavType.StringType },
-                    navArgument("date") { type = NavType.LongType },
-                    navArgument("repeat") { type = NavType.BoolType },
-                ),
+                arguments = listOf(navArgument("ddayId") { type = NavType.StringType }),
             ) { entry ->
-                val args = entry.arguments
                 DDayInputScreen(
                     onClose = { navController.popBackStack() },
-                    onSave = { navController.popBackStack() },
-                    initial = DDayEntry(
-                        title = args?.getString("title").orEmpty(),
-                        dateMillis = args?.getLong("date") ?: 0L,
-                        repeatYearly = args?.getBoolean("repeat") == true,
-                    ),
-                    onDelete = { navController.popBackStack() },
+                    onDone = { navController.popBackStack() },
+                    ddayId = entry.arguments?.getString("ddayId"),
                 )
             }
             composable(ROUTE_EXPENSE_INPUT) {

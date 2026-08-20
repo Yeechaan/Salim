@@ -25,6 +25,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -36,6 +37,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.chanbro.salim.core.ui.theme.SalimTheme
 import com.chanbro.salim.core.ui.theme.SalimTokens
 import com.chanbro.salim.ui.common.DatePickerModal
@@ -56,13 +59,40 @@ import com.chanbro.salim.ui.common.todayUtcMillis
 @Composable
 fun DDayInputScreen(
     onClose: () -> Unit,
-    onSave: () -> Unit,
+    onDone: () -> Unit,
     modifier: Modifier = Modifier,
-    initial: DDayEntry? = null,
-    onDelete: () -> Unit = {},
+    ddayId: String? = null,
+    viewModel: DDayInputViewModel = hiltViewModel(),
 ) {
-    val isEdit = initial != null
+    LaunchedEffect(ddayId) { viewModel.load(ddayId) }
+    val initial by viewModel.initial.collectAsStateWithLifecycle()
+    val loading by viewModel.loading.collectAsStateWithLifecycle()
 
+    // 프리필을 받기 전에는 그리지 않는다 (빈 입력값이 잠깐 보이는 것 방지).
+    if (loading) return
+    if (ddayId != null && initial == null) return
+
+    DDayInputContent(
+        isEdit = ddayId != null,
+        initial = initial,
+        onClose = onClose,
+        onSave = { title, dateMillis, repeatYearly ->
+            viewModel.save(title, dateMillis, repeatYearly, onDone)
+        },
+        onDelete = { viewModel.delete(onDone) },
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun DDayInputContent(
+    isEdit: Boolean,
+    initial: DDayInitial?,
+    onClose: () -> Unit,
+    onSave: (title: String, dateMillis: Long, repeatYearly: Boolean) -> Unit,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     var title by rememberSaveable { mutableStateOf(initial?.title.orEmpty()) }
     var dateMillis by rememberSaveable { mutableLongStateOf(initial?.dateMillis ?: todayUtcMillis()) }
     var repeatYearly by rememberSaveable { mutableStateOf(initial?.repeatYearly ?: false) }
@@ -104,7 +134,7 @@ fun DDayInputScreen(
 
         SaveButton(
             enabled = canSave,
-            onClick = onSave,
+            onClick = { onSave(title, dateMillis, repeatYearly) },
             label = if (isEdit) "수정 완료" else "저장하기",
         )
     }
@@ -227,7 +257,7 @@ private fun DeleteConfirmDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
 @Composable
 private fun DDayInputScreenAddPreview() {
     SalimTheme {
-        DDayInputScreen(onClose = {}, onSave = {})
+        DDayInputContent(isEdit = false, initial = null, onClose = {}, onSave = { _, _, _ -> }, onDelete = {})
     }
 }
 
@@ -235,10 +265,12 @@ private fun DDayInputScreenAddPreview() {
 @Composable
 private fun DDayInputScreenEditPreview() {
     SalimTheme {
-        DDayInputScreen(
+        DDayInputContent(
+            isEdit = true,
+            initial = DDayInitial("제주 여행", utcDate(2026, 9, 15), repeatYearly = false),
             onClose = {},
-            onSave = {},
-            initial = DDayEntry("제주 여행", utcDate(2026, 9, 15)),
+            onSave = { _, _, _ -> },
+            onDelete = {},
         )
     }
 }

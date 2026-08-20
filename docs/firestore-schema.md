@@ -63,12 +63,17 @@
 ### couples/{coupleId}/ddays/{ddayId}
 디데이. (PRD 6. 디데이)
 
-| 필드 | 설명 |
-|---|---|
-| title | 제목 |
-| date | 날짜 |
-| repeatYearly | 매년 반복 여부 |
-| source | auto(프로필 생일/기념일 연동) / manual |
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| title | String | 제목 |
+| dateMillis | Number | 기준 날짜 (UTC 자정 millis) |
+| repeatYearly | Boolean | 매년 반복 여부 |
+| source | String | AUTO(프로필 생일/기념일 연동) / MANUAL(직접 추가) |
+| createdAtMillis | Number | 등록 시각 |
+
+- 정렬(가까운 순)은 저장 시점이 아니라 표시 시점에 계산한다. 매년 반복 항목은 저장된 날짜와 다음 기념일이 다르기 때문에 Firestore `orderBy`로는 정렬할 수 없다.
+- AUTO 항목은 `users/{userId}`의 birthday/anniversary에서 파생된다. 디데이 탭에서 수정·삭제 불가.
+- 가계부와 동일하게, 현재 구현은 시뮬레이션 경로 `users/demo/ddays`를 사용한다.
 
 ### {categories}/{categoryId}
 가계부 카테고리. (PRD 7. 설정 - 카테고리 수정) — `users/{userId}/categories` / `couples/{coupleId}/categories` **공통 필드 스키마**.
