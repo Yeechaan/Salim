@@ -2,6 +2,7 @@ package com.chanbro.salim.ui.home
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,7 +24,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -48,35 +48,8 @@ import com.chanbro.salim.ui.common.MonthPickerSheet
 import com.chanbro.salim.ui.common.MonthSelector
 import com.chanbro.salim.ui.common.SalimCard
 import com.chanbro.salim.ui.common.SalimType
+import com.chanbro.salim.ui.common.categoryVisual
 import com.chanbro.salim.ui.dday.DDayListViewModel
-import com.chanbro.salim.ui.common.parseAmount
-
-// ---------------------------------------------------------------------------
-// 데이터 모델 (지금은 화면 상수. 이후 domain/data 모듈의 실제 데이터로 교체)
-// ---------------------------------------------------------------------------
-
-data class CategorySpend(val name: String, val amount: String, val color: Color)
-
-data class Transaction(val title: String, val subtitle: String, val amount: String)
-
-data class HomeUiState(
-    val year: Int = 2026,
-    val month: Int = 8,
-    val budgetSpent: String = "842,000원",
-    val budgetTotal: String = "1,200,000원",
-    val budgetRemainText: String = "남은 예산 358,000원",
-    val budgetUsedRatio: Float = 0.70f,
-    val categories: List<CategorySpend> = listOf(
-        CategorySpend("식비", "312,000원", SalimTokens.CatFood),
-        CategorySpend("문화/여가", "350,000원", SalimTokens.CatCulture),
-        CategorySpend("교통", "180,000원", SalimTokens.CatTransport),
-    ),
-    val recent: List<Transaction> = listOf(
-        Transaction("스타벅스", "식비 · 나 · 오늘", "-6,500원"),
-        Transaction("지하철", "교통 · 배우자 · 어제", "-3,000원"),
-        Transaction("영화관", "문화/여가 · 나 · 8/3", "-28,000원"),
-    ),
-)
 
 // ---------------------------------------------------------------------------
 // 화면 (하단 탭바는 상위 Scaffold가 제공, 여기서는 콘텐츠만)
@@ -85,11 +58,11 @@ data class HomeUiState(
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
-    state: HomeUiState = HomeUiState(),
+    viewModel: HomeViewModel = hiltViewModel(),
 ) {
-    var year by rememberSaveable { mutableIntStateOf(state.year) }
-    var month by rememberSaveable { mutableIntStateOf(state.month) }
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     var showMonthPicker by rememberSaveable { mutableStateOf(false) }
+    var showBudgetSheet by rememberSaveable { mutableStateOf(false) }
 
     Column(modifier = modifier.fillMaxSize()) {
         HomeTopBar()
@@ -101,10 +74,10 @@ fun HomeScreen(
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             MonthSelector(
-                label = "${year}년 ${month}월",
+                label = "${state.year}년 ${state.month}월",
                 onClick = { showMonthPicker = true },
             )
-            BudgetCard(state)
+            BudgetCard(state = state, onClick = { showBudgetSheet = true })
             CategoryCard(state.categories)
             UpcomingDDayCard()
             RecentTransactionsCard(state.recent)
@@ -113,13 +86,24 @@ fun HomeScreen(
 
     if (showMonthPicker) {
         MonthPickerSheet(
-            year = year,
-            month = month,
+            year = state.year,
+            month = state.month,
             onDismiss = { showMonthPicker = false },
             onSelect = { selectedYear, selectedMonth ->
-                year = selectedYear
-                month = selectedMonth
+                viewModel.setMonth(selectedYear, selectedMonth)
                 showMonthPicker = false
+            },
+        )
+    }
+    if (showBudgetSheet) {
+        BudgetInputSheet(
+            year = state.year,
+            month = state.month,
+            initialAmount = state.budgetAmount,
+            onDismiss = { showBudgetSheet = false },
+            onConfirm = { amount ->
+                viewModel.setBudget(amount)
+                showBudgetSheet = false
             },
         )
     }
@@ -152,74 +136,87 @@ private fun HomeTopBar() {
 }
 
 @Composable
-private fun BudgetCard(state: HomeUiState) {
-    SalimCard(cornerRadius = 24.dp) {
+private fun BudgetCard(state: HomeUiState, onClick: () -> Unit) {
+    SalimCard(cornerRadius = 24.dp, modifier = Modifier.clickable(onClick = onClick)) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("이번 달 예산", style = SalimType.labelMd, color = SalimTokens.TextMuted)
             Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(state.budgetSpent, style = SalimType.headlineMd, color = SalimTokens.TextPrimary)
-                Text(
-                    "/ ${state.budgetTotal}",
-                    style = SalimType.bodyMd,
-                    color = SalimTokens.TextMuted,
-                    modifier = Modifier.padding(bottom = 5.dp),
-                )
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(10.dp)
-                        .clip(CircleShape)
-                        .background(SalimTokens.ProgressTrack),
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(state.budgetUsedRatio)
-                            .fillMaxHeight()
-                            .clip(CircleShape)
-                            .background(
-                                Brush.horizontalGradient(
-                                    listOf(SalimTokens.ProgressFillStart, SalimTokens.ProgressFillEnd),
-                                ),
-                            ),
+                Text(state.spentText, style = SalimType.headlineMd, color = SalimTokens.TextPrimary)
+                val budgetText = state.budgetText
+                if (budgetText != null) {
+                    Text(
+                        "/ $budgetText",
+                        style = SalimType.bodyMd,
+                        color = SalimTokens.TextMuted,
+                        modifier = Modifier.padding(bottom = 5.dp),
                     )
                 }
-                Text(
-                    "${state.budgetRemainText} · ${(state.budgetUsedRatio * 100).toInt()}% 사용",
-                    style = SalimType.bodySm,
-                    color = SalimTokens.TextMuted,
-                )
+            }
+            val ratio = state.usedRatio
+            if (ratio == null) {
+                // 예산 미설정 — 카드를 탭해 설정하도록 안내 (PRD 3.)
+                Text("예산을 설정해보세요", style = SalimType.bodySm, color = SalimTokens.Accent)
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(10.dp)
+                            .clip(CircleShape)
+                            .background(SalimTokens.ProgressTrack),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(ratio)
+                                .fillMaxHeight()
+                                .clip(CircleShape)
+                                .background(
+                                    Brush.horizontalGradient(
+                                        listOf(SalimTokens.ProgressFillStart, SalimTokens.ProgressFillEnd),
+                                    ),
+                                ),
+                        )
+                    }
+                    Text(
+                        "${state.remainText} · ${state.usedPercent}% 사용",
+                        style = SalimType.bodySm,
+                        color = SalimTokens.TextMuted,
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun CategoryCard(categories: List<CategorySpend>) {
+private fun CategoryCard(categories: List<CategorySpendUi>) {
     SalimCard(cornerRadius = 24.dp) {
         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text("카테고리별 지출", style = SalimType.headlineSm, color = SalimTokens.TextPrimary)
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(24.dp),
-            ) {
-                DonutChart(categories)
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+            if (categories.isEmpty()) {
+                Text("이번 달 지출이 없어요", style = SalimType.bodyMd, color = SalimTokens.TextMuted)
+            } else {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(24.dp),
                 ) {
-                    categories.forEach { cat ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Box(Modifier.size(10.dp).clip(CircleShape).background(cat.color))
-                                Text(cat.name, style = SalimType.bodyMd, color = SalimTokens.TextMuted)
+                    DonutChart(categories)
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        categories.forEach { cat ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Box(Modifier.size(10.dp).clip(CircleShape).background(categoryVisual(cat.name).second))
+                                    Text(cat.name, style = SalimType.bodyMd, color = SalimTokens.TextMuted)
+                                }
+                                Text(cat.amount, style = SalimType.bodyMd, color = SalimTokens.TextPrimary)
                             }
-                            Text(cat.amount, style = SalimType.bodyMd, color = SalimTokens.TextPrimary)
                         }
                     }
                 }
@@ -229,10 +226,9 @@ private fun CategoryCard(categories: List<CategorySpend>) {
 }
 
 @Composable
-private fun DonutChart(categories: List<CategorySpend>) {
+private fun DonutChart(categories: List<CategorySpendUi>) {
     Box(modifier = Modifier.size(120.dp), contentAlignment = Alignment.Center) {
-        val values = categories.map { parseAmount(it.amount) }
-        val total = values.sum().coerceAtLeast(1L).toFloat()
+        val colors = categories.map { categoryVisual(it.name).second }
         Canvas(modifier = Modifier.fillMaxSize()) {
             val strokeWidth = size.minDimension * 0.22f
             val diameter = size.minDimension - strokeWidth
@@ -249,9 +245,9 @@ private fun DonutChart(categories: List<CategorySpend>) {
             )
             var startAngle = -90f
             categories.forEachIndexed { i, cat ->
-                val sweep = values[i] / total * 360f
+                val sweep = cat.ratio * 360f
                 drawArc(
-                    color = cat.color,
+                    color = colors[i],
                     startAngle = startAngle + 1.5f,
                     sweepAngle = (sweep - 3f).coerceAtLeast(0f),
                     useCenter = false,
@@ -298,7 +294,7 @@ private fun UpcomingDDayCard(viewModel: DDayListViewModel = hiltViewModel()) {
 }
 
 @Composable
-private fun RecentTransactionsCard(items: List<Transaction>) {
+private fun RecentTransactionsCard(items: List<TransactionUi>) {
     SalimCard(cornerRadius = 24.dp) {
         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Row(
@@ -309,7 +305,9 @@ private fun RecentTransactionsCard(items: List<Transaction>) {
                 Text("최근 지출 내역", style = SalimType.headlineSm, color = SalimTokens.TextPrimary)
                 Text("전체보기", style = SalimType.labelMd, color = SalimTokens.Accent)
             }
-            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            if (items.isEmpty()) {
+                Text("아직 등록된 지출이 없어요", style = SalimType.bodyMd, color = SalimTokens.TextMuted)
+            } else Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 items.forEachIndexed { index, txn ->
                     TransactionRow(txn)
                     if (index != items.lastIndex) {
@@ -327,7 +325,7 @@ private fun RecentTransactionsCard(items: List<Transaction>) {
 }
 
 @Composable
-private fun TransactionRow(txn: Transaction) {
+private fun TransactionRow(txn: TransactionUi) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -335,7 +333,7 @@ private fun TransactionRow(txn: Transaction) {
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(txn.title, style = SalimType.bodyLg, color = SalimTokens.TextPrimary)
-            Text(txn.subtitle, style = SalimType.bodySm, color = SalimTokens.TextMuted)
+            Text(txn.meta, style = SalimType.bodySm, color = SalimTokens.TextMuted)
         }
         Text(txn.amount, style = SalimType.bodyLg.copy(fontWeight = FontWeight.Medium), color = SalimTokens.TextPrimary)
     }

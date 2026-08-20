@@ -35,11 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.OffsetMapping
-import androidx.compose.ui.text.input.TransformedText
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -55,7 +51,7 @@ import com.chanbro.salim.ui.common.SalimChip
 import com.chanbro.salim.ui.common.SalimType
 import com.chanbro.salim.ui.common.SaveButton
 import com.chanbro.salim.ui.common.formatDate
-import com.chanbro.salim.ui.common.formatThousands
+import com.chanbro.salim.ui.common.ThousandsTransformation
 import com.chanbro.salim.ui.common.todayUtcMillis
 import java.util.Calendar
 
@@ -321,41 +317,6 @@ private fun formatTime(hour24: Int, minute: Int): String {
     val ampm = if (hour24 < 12) "오전" else "오후"
     val h12 = (hour24 % 12).let { if (it == 0) 12 else it }
     return "$ampm $h12:${minute.toString().padStart(2, '0')}"
-}
-
-// ---------------------------------------------------------------------------
-// 금액 입력 천단위 콤마 VisualTransformation
-// ---------------------------------------------------------------------------
-
-private val ThousandsTransformation = object : VisualTransformation {
-    override fun filter(text: AnnotatedString): TransformedText {
-        val digits = text.text
-        val formatted = formatThousands(digits)
-        val mapping = object : OffsetMapping {
-            override fun originalToTransformed(offset: Int): Int {
-                if (offset <= 0) return 0
-                var seen = 0
-                for (i in formatted.indices) {
-                    if (formatted[i] != ',') {
-                        seen++
-                        if (seen == offset) return i + 1
-                    }
-                }
-                return formatted.length
-            }
-
-            override fun transformedToOriginal(offset: Int): Int {
-                var seen = 0
-                var i = 0
-                while (i < offset && i < formatted.length) {
-                    if (formatted[i] != ',') seen++
-                    i++
-                }
-                return seen
-            }
-        }
-        return TransformedText(AnnotatedString(formatted), mapping)
-    }
 }
 
 // ---------------------------------------------------------------------------
