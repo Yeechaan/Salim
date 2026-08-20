@@ -55,6 +55,32 @@ class DDayCalcTest {
     }
 
     @Test
+    fun `2월 29일 기념일은 평년에 2월 28일로 당긴다`() {
+        val leapDay = utcDate(2024, 2, 29)
+        assertEquals(utcDate(2026, 2, 28), nextOccurrence(leapDay, utcDate(2026, 1, 1), repeatYearly = true))
+    }
+
+    @Test
+    fun `2월 29일 기념일은 윤년엔 그대로 29일`() {
+        val leapDay = utcDate(2024, 2, 29)
+        assertEquals(utcDate(2028, 2, 29), nextOccurrence(leapDay, utcDate(2028, 1, 1), repeatYearly = true))
+    }
+
+    @Test
+    fun `평년 2월 28일 당일이면 D-DAY로 본다`() {
+        val leapDay = utcDate(2024, 2, 29)
+        val feb28 = utcDate(2026, 2, 28)
+        assertEquals(0L, daysUntil(nextOccurrence(leapDay, feb28, repeatYearly = true), feb28))
+    }
+
+    @Test
+    fun `평년 2월 28일이 지나면 내년으로 넘어간다`() {
+        val leapDay = utcDate(2024, 2, 29)
+        val mar1 = utcDate(2026, 3, 1)
+        assertEquals(utcDate(2027, 2, 28), nextOccurrence(leapDay, mar1, repeatYearly = true))
+    }
+
+    @Test
     fun `날짜 표기는 점 구분 8자리`() {
         assertEquals("2026.08.31", formatDotDate(utcDate(2026, 8, 31)))
     }

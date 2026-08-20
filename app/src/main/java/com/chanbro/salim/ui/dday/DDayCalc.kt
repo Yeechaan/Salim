@@ -26,27 +26,32 @@ fun utcDate(year: Int, month: Int, day: Int): Long =
         set(year, month - 1, day)
     }.timeInMillis
 
+/** 해당 연/월에 없는 날짜는 그 달 마지막 날로 당긴다 (2월 29일 → 평년 2월 28일). */
+private fun utcDateClamped(year: Int, month: Int, day: Int): Long =
+    Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
+        clear()
+        set(year, month - 1, 1)
+        set(Calendar.DAY_OF_MONTH, day.coerceAtMost(getActualMaximum(Calendar.DAY_OF_MONTH)))
+    }.timeInMillis
+
 /**
  * 화면에 표시할 실제 대상 날짜.
  * 매년 반복이면 오늘(당일 포함) 이후로 돌아오는 가장 가까운 기념일, 아니면 원래 날짜 그대로.
- * 2월 29일은 평년에 3월 1일로 넘어간다(Calendar 기본 동작).
+ *
+ * 2월 29일 기념일은 평년에 2월 28일로 당긴다. java.time(LocalDate.withYear)이 쓰는 방식과
+ * 같아 나중에 java.time으로 옮겨도 동작이 바뀌지 않고, 기념일이 2월 안에 남는다.
+ * (iCalendar 표준처럼 건너뛰면 4년에 한 번만 떠서 디데이로는 쓸 수 없다.)
  */
 fun nextOccurrence(dateMillis: Long, todayMillis: Long, repeatYearly: Boolean): Long {
     if (!repeatYearly) return dateMillis
 
     val target = utcCalendar(dateMillis)
     val today = utcCalendar(todayMillis)
-    val thisYear = utcDate(
-        year = today.get(Calendar.YEAR),
-        month = target.get(Calendar.MONTH) + 1,
-        day = target.get(Calendar.DAY_OF_MONTH),
-    )
+    val month = target.get(Calendar.MONTH) + 1
+    val day = target.get(Calendar.DAY_OF_MONTH)
+    val thisYear = utcDateClamped(today.get(Calendar.YEAR), month, day)
     if (thisYear >= todayMillis) return thisYear
-    return utcDate(
-        year = today.get(Calendar.YEAR) + 1,
-        month = target.get(Calendar.MONTH) + 1,
-        day = target.get(Calendar.DAY_OF_MONTH),
-    )
+    return utcDateClamped(today.get(Calendar.YEAR) + 1, month, day)
 }
 
 /** 오늘부터 대상 날짜까지 남은 일수. 0이면 당일, 음수면 이미 지난 날. */
