@@ -17,6 +17,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -27,6 +28,7 @@ import com.chanbro.salim.core.ui.theme.SalimTokens
 import com.chanbro.salim.ui.common.DDayBadge
 import com.chanbro.salim.ui.common.SalimCard
 import com.chanbro.salim.ui.common.SalimType
+import com.chanbro.salim.ui.common.todayUtcMillis
 
 // ---------------------------------------------------------------------------
 // 데이터 모델 (지금은 화면 상수. 이후 domain/data 모듈의 실제 데이터로 교체)
@@ -36,20 +38,36 @@ import com.chanbro.salim.ui.common.SalimType
 
 data class DDayEntry(
     val title: String,
-    val date: String,
-    val dDay: String,
+    val dateMillis: Long,
     val isAuto: Boolean = false,
     val repeatYearly: Boolean = false,
 )
 
 data class DDayUiState(
     val items: List<DDayEntry> = listOf(
-        DDayEntry("결혼기념일", "2026.08.31", "D-12", isAuto = true, repeatYearly = true),
-        DDayEntry("제주 여행", "2026.09.15", "D-27"),
-        DDayEntry("배우자 생일", "2026.10.02", "D-44", isAuto = true, repeatYearly = true),
-        DDayEntry("이사", "2026.11.20", "D-93"),
+        DDayEntry("결혼기념일", utcDate(2020, 8, 31), isAuto = true, repeatYearly = true),
+        DDayEntry("제주 여행", utcDate(2026, 9, 15)),
+        DDayEntry("배우자 생일", utcDate(1993, 10, 2), isAuto = true, repeatYearly = true),
+        DDayEntry("이사", utcDate(2026, 11, 20)),
     ),
 )
+
+/** 화면에 그릴 한 줄: 원본 항목 + 오늘 기준으로 계산한 값. */
+private data class DDayRow(
+    val entry: DDayEntry,
+    val targetMillis: Long,
+    val days: Long,
+)
+
+/**
+ * 가까운 순 정렬 (PRD 6.). 다가올 날짜를 남은 일수 오름차순으로 먼저 놓고,
+ * 이미 지난 1회성 항목은 최근에 지난 것부터 뒤에 붙인다.
+ */
+private fun List<DDayEntry>.toRows(todayMillis: Long): List<DDayRow> =
+    map { entry ->
+        val target = nextOccurrence(entry.dateMillis, todayMillis, entry.repeatYearly)
+        DDayRow(entry = entry, targetMillis = target, days = daysUntil(target, todayMillis))
+    }.sortedWith(compareBy({ it.days < 0 }, { kotlin.math.abs(it.days) }))
 
 // ---------------------------------------------------------------------------
 // 디데이 리스트 (dday.md 6-1) — 탭 랜딩 화면
@@ -62,9 +80,12 @@ fun DDayScreen(
     state: DDayUiState = DDayUiState(),
     onItemClick: (DDayEntry) -> Unit = {},
 ) {
+    val today = remember { todayUtcMillis() }
+    val rows = remember(state.items, today) { state.items.toRows(today) }
+
     Column(modifier = modifier.fillMaxSize()) {
         DDayTopBar()
-        if (state.items.isEmpty()) {
+        if (rows.isEmpty()) {
             EmptyState()
         } else {
             Column(
@@ -75,9 +96,9 @@ fun DDayScreen(
             ) {
                 SalimCard(cornerRadius = 24.dp) {
                     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        state.items.forEachIndexed { index, entry ->
-                            DDayRow(entry = entry, onClick = { onItemClick(entry) })
-                            if (index != state.items.lastIndex) {
+                        rows.forEachIndexed { index, row ->
+                            DDayItemRow(row = row, onClick = { onItemClick(row.entry) })
+                            if (index != rows.lastIndex) {
                                 RowDivider()
                             }
                         }
@@ -105,7 +126,8 @@ private fun DDayTopBar() {
 }
 
 @Composable
-private fun DDayRow(entry: DDayEntry, onClick: () -> Unit) {
+private fun DDayItemRow(row: DDayRow, onClick: () -> Unit) {
+    val entry = row.entry
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -113,7 +135,7 @@ private fun DDayRow(entry: DDayEntry, onClick: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        DDayBadge(entry.dDay)
+        DDayBadge(dDayLabel(row.days))
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -124,7 +146,9 @@ private fun DDayRow(entry: DDayEntry, onClick: () -> Unit) {
                 if (entry.isAuto) AutoTag()
             }
             Text(
-                if (entry.repeatYearly) "${entry.date} · 매년 반복" else entry.date,
+                formatDotDate(row.targetMillis).let {
+                    if (entry.repeatYearly) "$it · 매년 반복" else it
+                },
                 style = SalimType.bodySm,
                 color = SalimTokens.TextMuted,
             )

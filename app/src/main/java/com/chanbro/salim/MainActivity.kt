@@ -49,7 +49,7 @@ private const val ROUTE_DDAY_EDIT = "dday_edit/{title}/{date}/{repeat}"
 
 // TODO: 데이터 계층 도입 후 ddayId만 넘기도록 교체
 private fun ddayEditRoute(entry: DDayEntry): String =
-    "dday_edit/${Uri.encode(entry.title)}/${Uri.encode(entry.date)}/${entry.repeatYearly}"
+    "dday_edit/${Uri.encode(entry.title)}/${entry.dateMillis}/${entry.repeatYearly}"
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -144,7 +144,7 @@ private fun SalimApp() {
                 ROUTE_DDAY_EDIT,
                 arguments = listOf(
                     navArgument("title") { type = NavType.StringType },
-                    navArgument("date") { type = NavType.StringType },
+                    navArgument("date") { type = NavType.LongType },
                     navArgument("repeat") { type = NavType.BoolType },
                 ),
             ) { entry ->
@@ -154,8 +154,7 @@ private fun SalimApp() {
                     onSave = { navController.popBackStack() },
                     initial = DDayEntry(
                         title = args?.getString("title").orEmpty(),
-                        date = args?.getString("date").orEmpty(),
-                        dDay = "",
+                        dateMillis = args?.getLong("date") ?: 0L,
                         repeatYearly = args?.getBoolean("repeat") == true,
                     ),
                     onDelete = { navController.popBackStack() },

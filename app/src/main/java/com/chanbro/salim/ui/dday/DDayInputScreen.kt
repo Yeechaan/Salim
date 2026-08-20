@@ -46,8 +46,6 @@ import com.chanbro.salim.ui.common.SalimType
 import com.chanbro.salim.ui.common.SaveButton
 import com.chanbro.salim.ui.common.formatDate
 import com.chanbro.salim.ui.common.todayUtcMillis
-import java.util.Calendar
-import java.util.TimeZone
 
 // ---------------------------------------------------------------------------
 // 디데이 추가 / 수정 (dday.md 6-2, 6-3) — 전체 화면 목적지
@@ -66,9 +64,7 @@ fun DDayInputScreen(
     val isEdit = initial != null
 
     var title by rememberSaveable { mutableStateOf(initial?.title.orEmpty()) }
-    var dateMillis by rememberSaveable {
-        mutableLongStateOf(initial?.date?.let(::parseDotDate) ?: todayUtcMillis())
-    }
+    var dateMillis by rememberSaveable { mutableLongStateOf(initial?.dateMillis ?: todayUtcMillis()) }
     var repeatYearly by rememberSaveable { mutableStateOf(initial?.repeatYearly ?: false) }
     var showDatePicker by rememberSaveable { mutableStateOf(false) }
     var showDeleteConfirm by rememberSaveable { mutableStateOf(false) }
@@ -223,15 +219,6 @@ private fun DeleteConfirmDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
     )
 }
 
-/** 리스트 표기("2026.09.15")를 DatePicker 규약(UTC 자정 millis)으로. 형식이 어긋나면 null. */
-private fun parseDotDate(text: String): Long? = runCatching {
-    val (y, m, d) = text.split(".").map { it.trim().toInt() }
-    Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
-        clear()
-        set(y, m - 1, d)
-    }.timeInMillis
-}.getOrNull()
-
 // ---------------------------------------------------------------------------
 // 프리뷰
 // ---------------------------------------------------------------------------
@@ -251,7 +238,7 @@ private fun DDayInputScreenEditPreview() {
         DDayInputScreen(
             onClose = {},
             onSave = {},
-            initial = DDayEntry("제주 여행", "2026.09.15", "D-27"),
+            initial = DDayEntry("제주 여행", utcDate(2026, 9, 15)),
         )
     }
 }
