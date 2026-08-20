@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -26,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -41,10 +41,18 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.chanbro.salim.core.ui.theme.SalimTheme
 import com.chanbro.salim.core.ui.theme.SalimTokens
+import com.chanbro.salim.ui.common.DDayBadge
 import com.chanbro.salim.ui.common.MonthPickerSheet
 import com.chanbro.salim.ui.common.MonthSelector
 import com.chanbro.salim.ui.common.SalimCard
 import com.chanbro.salim.ui.common.SalimType
+import com.chanbro.salim.ui.common.todayUtcMillis
+import com.chanbro.salim.ui.dday.DDayEntry
+import com.chanbro.salim.ui.dday.DDayUiState
+import com.chanbro.salim.ui.dday.dDayLabel
+import com.chanbro.salim.ui.dday.daysUntil
+import com.chanbro.salim.ui.dday.formatDotDate
+import com.chanbro.salim.ui.dday.nextOccurrence
 import com.chanbro.salim.ui.common.parseAmount
 
 // ---------------------------------------------------------------------------
@@ -52,8 +60,6 @@ import com.chanbro.salim.ui.common.parseAmount
 // ---------------------------------------------------------------------------
 
 data class CategorySpend(val name: String, val amount: String, val color: Color)
-
-data class DDayItem(val title: String, val date: String, val dDay: String)
 
 data class Transaction(val title: String, val subtitle: String, val amount: String)
 
@@ -69,10 +75,7 @@ data class HomeUiState(
         CategorySpend("문화/여가", "350,000원", SalimTokens.CatCulture),
         CategorySpend("교통", "180,000원", SalimTokens.CatTransport),
     ),
-    val dDays: List<DDayItem> = listOf(
-        DDayItem("결혼기념일", "2026.08.31", "D-12"),
-        DDayItem("제주 여행", "2026.09.15", "D-27"),
-    ),
+    val dDays: List<DDayEntry> = DDayUiState().items,
     val recent: List<Transaction> = listOf(
         Transaction("스타벅스", "식비 · 나 · 오늘", "-6,500원"),
         Transaction("지하철", "교통 · 배우자 · 어제", "-3,000원"),
@@ -268,40 +271,37 @@ private fun DonutChart(categories: List<CategorySpend>) {
 }
 
 @Composable
-private fun UpcomingDDayCard(dDays: List<DDayItem>) {
+private fun UpcomingDDayCard(dDays: List<DDayEntry>) {
+    val today = remember { todayUtcMillis() }
+    // 가장 가까운 1~2건만 노출 (wireframe/home.md 4.)
+    val upcoming = remember(dDays, today) {
+        dDays.map { entry ->
+            val target = nextOccurrence(entry.dateMillis, today, entry.repeatYearly)
+            Triple(entry.title, target, daysUntil(target, today))
+        }
+            .filter { it.third >= 0 }
+            .sortedBy { it.third }
+            .take(2)
+    }
     SalimCard(cornerRadius = 24.dp) {
         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text("다가오는 디데이", style = SalimType.headlineSm, color = SalimTokens.TextPrimary)
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                dDays.take(2).forEach { item ->
+                upcoming.forEach { (title, targetMillis, days) ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(14.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        DDayBadge(item.dDay)
+                        DDayBadge(dDayLabel(days))
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text(item.title, style = SalimType.bodyLg, color = SalimTokens.TextPrimary)
-                            Text(item.date, style = SalimType.bodySm, color = SalimTokens.TextMuted)
+                            Text(title, style = SalimType.bodyLg, color = SalimTokens.TextPrimary)
+                            Text(formatDotDate(targetMillis), style = SalimType.bodySm, color = SalimTokens.TextMuted)
                         }
                     }
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun DDayBadge(text: String) {
-    Box(
-        modifier = Modifier
-            .widthIn(min = 56.dp)
-            .clip(CircleShape)
-            .background(SalimTokens.Accent)
-            .padding(horizontal = 12.dp, vertical = 7.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(text, style = SalimType.labelMd.copy(fontWeight = FontWeight.Bold), color = Color.White)
     }
 }
 

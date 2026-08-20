@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
@@ -21,12 +23,18 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -46,6 +54,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.chanbro.salim.core.ui.theme.SalimTokens
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 
 // ---------------------------------------------------------------------------
 // 타이포그래피 (design.md: 헤드라인/금액 = 세리프(Gowun Batang 대체), 본문 = 산세리프(Gowun Dodum 대체))
@@ -274,6 +287,119 @@ fun SalimChip(
         )
     }
 }
+
+// ---------------------------------------------------------------------------
+// D-day 배지 (design.md: D-day 배지 = Coral 배경 + 흰 굵은 텍스트)
+// 쓰임: 홈 "다가오는 디데이", 디데이 리스트
+// ---------------------------------------------------------------------------
+
+@Composable
+fun DDayBadge(text: String, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .widthIn(min = 56.dp)
+            .clip(CircleShape)
+            .background(SalimTokens.Accent)
+            .padding(horizontal = 12.dp, vertical = 7.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, style = SalimType.labelMd.copy(fontWeight = FontWeight.Bold), color = Color.White)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 입력 화면 공용 요소 (지출 입력 / 디데이 추가·수정 공유)
+// ---------------------------------------------------------------------------
+
+/** 카드 안 한 줄 입력 항목: 좌측 라벨 + 우측 현재 값. 탭하면 피커를 띄운다. */
+@Composable
+fun FieldRow(label: String, value: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 14.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = SalimType.bodyMd, color = SalimTokens.TextMuted)
+        Text(value, style = SalimType.bodyLg, color = SalimTokens.TextPrimary)
+    }
+}
+
+@Composable
+fun FieldDivider() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(SalimTokens.Divider),
+    )
+}
+
+/** 하단 고정 CTA 버튼 (design.md: Material3 Filled Button, 폭 100%) */
+@Composable
+fun SaveButton(enabled: Boolean, onClick: () -> Unit, label: String = "저장하기") {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+    ) {
+        Button(
+            onClick = onClick,
+            enabled = enabled,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(54.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = SalimTokens.Accent,
+                contentColor = Color.White,
+                disabledContainerColor = SalimTokens.ProgressTrack,
+                disabledContentColor = SalimTokens.TextMuted,
+            ),
+        ) {
+            Text(label, style = SalimType.bodyLg.copy(fontWeight = FontWeight.Bold))
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DatePickerModal(
+    initialMillis: Long,
+    onConfirm: (Long) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val state = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = { state.selectedDateMillis?.let(onConfirm) ?: onDismiss() }) {
+                Text("확인", color = SalimTokens.Accent)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("취소", color = SalimTokens.TextMuted) }
+        },
+    ) {
+        DatePicker(state = state)
+    }
+}
+
+/** UTC 자정 기준(Material3 DatePicker 규약)으로 오늘 날짜의 millis. */
+fun todayUtcMillis(): Long {
+    val local = Calendar.getInstance()
+    return Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
+        clear()
+        set(local.get(Calendar.YEAR), local.get(Calendar.MONTH), local.get(Calendar.DAY_OF_MONTH))
+    }.timeInMillis
+}
+
+fun formatDate(utcMillis: Long): String =
+    SimpleDateFormat("yyyy년 M월 d일", Locale.KOREAN).apply {
+        timeZone = TimeZone.getTimeZone("UTC")
+    }.format(Date(utcMillis))
 
 // ---------------------------------------------------------------------------
 // 유틸
