@@ -33,6 +33,7 @@ import com.chanbro.salim.core.ui.theme.SalimTokens
 import com.chanbro.salim.ui.common.SalimBottomBar
 import com.chanbro.salim.ui.common.SalimTab
 import com.chanbro.salim.ui.common.SalimType
+import com.chanbro.salim.ui.dday.DDayScreen
 import com.chanbro.salim.ui.expense.ExpenseInputScreen
 import com.chanbro.salim.ui.expense.ExpenseScreen
 import com.chanbro.salim.ui.home.HomeScreen
@@ -79,14 +80,26 @@ private fun SalimApp() {
             }
         },
         floatingActionButton = {
-            // FAB 노출 규칙(main-shell.md): 가계부/일정/디데이. 지금은 가계부만 실제 화면.
-            if (currentRoute == SalimTab.Expense.route) {
-                FloatingActionButton(
-                    onClick = { navController.navigate(ROUTE_EXPENSE_INPUT) },
-                    containerColor = SalimTokens.Accent,
-                    contentColor = Color.White,
-                ) {
-                    Icon(Icons.Filled.Add, contentDescription = "지출 추가")
+            // FAB 노출 규칙(main-shell.md): 가계부/일정/디데이. 일정은 아직 플레이스홀더.
+            when (currentRoute) {
+                SalimTab.Expense.route -> {
+                    FloatingActionButton(
+                        onClick = { navController.navigate(ROUTE_EXPENSE_INPUT) },
+                        containerColor = SalimTokens.Accent,
+                        contentColor = Color.White,
+                    ) {
+                        Icon(Icons.Filled.Add, contentDescription = "지출 추가")
+                    }
+                }
+                SalimTab.DDay.route -> {
+                    FloatingActionButton(
+                        // TODO: 디데이 추가 화면(dday.md 6-2) 구현 후 해당 route로 연결
+                        onClick = {},
+                        containerColor = SalimTokens.Accent,
+                        contentColor = Color.White,
+                    ) {
+                        Icon(Icons.Filled.Add, contentDescription = "디데이 추가")
+                    }
                 }
             }
         },
@@ -101,7 +114,7 @@ private fun SalimApp() {
                 ExpenseScreen(onItemClick = { navController.navigate(ROUTE_EXPENSE_INPUT) })
             }
             composable(SalimTab.Schedule.route) { PlaceholderScreen(SalimTab.Schedule.label) }
-            composable(SalimTab.DDay.route) { PlaceholderScreen(SalimTab.DDay.label) }
+            composable(SalimTab.DDay.route) { DDayScreen() }
             composable(SalimTab.Settings.route) { PlaceholderScreen(SalimTab.Settings.label) }
             composable(ROUTE_EXPENSE_INPUT) {
                 ExpenseInputScreen(

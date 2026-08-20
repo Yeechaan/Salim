@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -41,6 +40,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.chanbro.salim.core.ui.theme.SalimTheme
 import com.chanbro.salim.core.ui.theme.SalimTokens
+import com.chanbro.salim.ui.common.DDayBadge
 import com.chanbro.salim.ui.common.MonthPickerSheet
 import com.chanbro.salim.ui.common.MonthSelector
 import com.chanbro.salim.ui.common.SalimCard
@@ -288,20 +288,6 @@ private fun UpcomingDDayCard(dDays: List<DDayItem>) {
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun DDayBadge(text: String) {
-    Box(
-        modifier = Modifier
-            .widthIn(min = 56.dp)
-            .clip(CircleShape)
-            .background(SalimTokens.Accent)
-            .padding(horizontal = 12.dp, vertical = 7.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(text, style = SalimType.labelMd.copy(fontWeight = FontWeight.Bold), color = Color.White)
     }
 }
 

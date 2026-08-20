@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
@@ -272,6 +274,25 @@ fun SalimChip(
             style = SalimType.bodyMd.copy(fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium),
             color = if (selected) Color.White else SalimTokens.Accent,
         )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// D-day 배지 (design.md: D-day 배지 = Coral 배경 + 흰 굵은 텍스트)
+// 쓰임: 홈 "다가오는 디데이", 디데이 리스트
+// ---------------------------------------------------------------------------
+
+@Composable
+fun DDayBadge(text: String, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .widthIn(min = 56.dp)
+            .clip(CircleShape)
+            .background(SalimTokens.Accent)
+            .padding(horizontal = 12.dp, vertical = 7.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, style = SalimType.labelMd.copy(fontWeight = FontWeight.Bold), color = Color.White)
     }
 }
 
