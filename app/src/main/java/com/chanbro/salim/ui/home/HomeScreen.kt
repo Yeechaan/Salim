@@ -39,6 +39,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.chanbro.salim.core.ui.theme.SalimTheme
 import com.chanbro.salim.core.ui.theme.SalimTokens
 import com.chanbro.salim.ui.common.DDayBadge
@@ -46,13 +48,7 @@ import com.chanbro.salim.ui.common.MonthPickerSheet
 import com.chanbro.salim.ui.common.MonthSelector
 import com.chanbro.salim.ui.common.SalimCard
 import com.chanbro.salim.ui.common.SalimType
-import com.chanbro.salim.ui.common.todayUtcMillis
-import com.chanbro.salim.ui.dday.DDayEntry
-import com.chanbro.salim.ui.dday.DDayUiState
-import com.chanbro.salim.ui.dday.dDayLabel
-import com.chanbro.salim.ui.dday.daysUntil
-import com.chanbro.salim.ui.dday.formatDotDate
-import com.chanbro.salim.ui.dday.nextOccurrence
+import com.chanbro.salim.ui.dday.DDayListViewModel
 import com.chanbro.salim.ui.common.parseAmount
 
 // ---------------------------------------------------------------------------
@@ -75,7 +71,6 @@ data class HomeUiState(
         CategorySpend("문화/여가", "350,000원", SalimTokens.CatCulture),
         CategorySpend("교통", "180,000원", SalimTokens.CatTransport),
     ),
-    val dDays: List<DDayEntry> = DDayUiState().items,
     val recent: List<Transaction> = listOf(
         Transaction("스타벅스", "식비 · 나 · 오늘", "-6,500원"),
         Transaction("지하철", "교통 · 배우자 · 어제", "-3,000원"),
@@ -111,7 +106,7 @@ fun HomeScreen(
             )
             BudgetCard(state)
             CategoryCard(state.categories)
-            UpcomingDDayCard(state.dDays)
+            UpcomingDDayCard()
             RecentTransactionsCard(state.recent)
         }
     }
@@ -271,32 +266,29 @@ private fun DonutChart(categories: List<CategorySpend>) {
 }
 
 @Composable
-private fun UpcomingDDayCard(dDays: List<DDayEntry>) {
-    val today = remember { todayUtcMillis() }
-    // 가장 가까운 1~2건만 노출 (wireframe/home.md 4.)
-    val upcoming = remember(dDays, today) {
-        dDays.map { entry ->
-            val target = nextOccurrence(entry.dateMillis, today, entry.repeatYearly)
-            Triple(entry.title, target, daysUntil(target, today))
-        }
-            .filter { it.third >= 0 }
-            .sortedBy { it.third }
-            .take(2)
-    }
+private fun UpcomingDDayCard(viewModel: DDayListViewModel = hiltViewModel()) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    // 가장 가까운 1~2건만 노출. 이미 지난 항목은 제외 (wireframe/home.md 4.)
+    val upcoming = state.rows.filterNot { it.dDayText.startsWith("D+") }.take(2)
+
     SalimCard(cornerRadius = 24.dp) {
         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text("다가오는 디데이", style = SalimType.headlineSm, color = SalimTokens.TextPrimary)
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                upcoming.forEach { (title, targetMillis, days) ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        DDayBadge(dDayLabel(days))
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text(title, style = SalimType.bodyLg, color = SalimTokens.TextPrimary)
-                            Text(formatDotDate(targetMillis), style = SalimType.bodySm, color = SalimTokens.TextMuted)
+            if (upcoming.isEmpty()) {
+                Text("디데이를 추가해보세요", style = SalimType.bodyMd, color = SalimTokens.TextMuted)
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    upcoming.forEach { row ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            DDayBadge(row.dDayText)
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(row.title, style = SalimType.bodyLg, color = SalimTokens.TextPrimary)
+                                Text(row.dateText, style = SalimType.bodySm, color = SalimTokens.TextMuted)
+                            }
                         }
                     }
                 }

@@ -17,57 +17,19 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.chanbro.salim.core.ui.theme.SalimTheme
 import com.chanbro.salim.core.ui.theme.SalimTokens
 import com.chanbro.salim.ui.common.DDayBadge
 import com.chanbro.salim.ui.common.SalimCard
 import com.chanbro.salim.ui.common.SalimType
-import com.chanbro.salim.ui.common.todayUtcMillis
-
-// ---------------------------------------------------------------------------
-// 데이터 모델 (지금은 화면 상수. 이후 domain/data 모듈의 실제 데이터로 교체)
-// 필드 기준: docs/firestore-schema.md의 ddays (title / date / repeatYearly / source)
-// isAuto = source가 auto(설정 > 프로필의 생일·기념일 자동 반영)인 항목
-// ---------------------------------------------------------------------------
-
-data class DDayEntry(
-    val title: String,
-    val dateMillis: Long,
-    val isAuto: Boolean = false,
-    val repeatYearly: Boolean = false,
-)
-
-data class DDayUiState(
-    val items: List<DDayEntry> = listOf(
-        DDayEntry("결혼기념일", utcDate(2020, 8, 31), isAuto = true, repeatYearly = true),
-        DDayEntry("제주 여행", utcDate(2026, 9, 15)),
-        DDayEntry("배우자 생일", utcDate(1993, 10, 2), isAuto = true, repeatYearly = true),
-        DDayEntry("이사", utcDate(2026, 11, 20)),
-    ),
-)
-
-/** 화면에 그릴 한 줄: 원본 항목 + 오늘 기준으로 계산한 값. */
-private data class DDayRow(
-    val entry: DDayEntry,
-    val targetMillis: Long,
-    val days: Long,
-)
-
-/**
- * 가까운 순 정렬 (PRD 6.). 다가올 날짜를 남은 일수 오름차순으로 먼저 놓고,
- * 이미 지난 1회성 항목은 최근에 지난 것부터 뒤에 붙인다.
- */
-private fun List<DDayEntry>.toRows(todayMillis: Long): List<DDayRow> =
-    map { entry ->
-        val target = nextOccurrence(entry.dateMillis, todayMillis, entry.repeatYearly)
-        DDayRow(entry = entry, targetMillis = target, days = daysUntil(target, todayMillis))
-    }.sortedWith(compareBy({ it.days < 0 }, { kotlin.math.abs(it.days) }))
 
 // ---------------------------------------------------------------------------
 // 디데이 리스트 (dday.md 6-1) — 탭 랜딩 화면
@@ -77,15 +39,22 @@ private fun List<DDayEntry>.toRows(todayMillis: Long): List<DDayRow> =
 @Composable
 fun DDayScreen(
     modifier: Modifier = Modifier,
-    state: DDayUiState = DDayUiState(),
-    onItemClick: (DDayEntry) -> Unit = {},
+    onItemClick: (DDayRowUi) -> Unit = {},
+    viewModel: DDayListViewModel = hiltViewModel(),
 ) {
-    val today = remember { todayUtcMillis() }
-    val rows = remember(state.items, today) { state.items.toRows(today) }
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    DDayContent(state = state, modifier = modifier, onItemClick = onItemClick)
+}
 
+@Composable
+private fun DDayContent(
+    state: DDayListUiState,
+    modifier: Modifier = Modifier,
+    onItemClick: (DDayRowUi) -> Unit,
+) {
     Column(modifier = modifier.fillMaxSize()) {
         DDayTopBar()
-        if (rows.isEmpty()) {
+        if (state.rows.isEmpty()) {
             EmptyState()
         } else {
             Column(
@@ -96,9 +65,9 @@ fun DDayScreen(
             ) {
                 SalimCard(cornerRadius = 24.dp) {
                     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        rows.forEachIndexed { index, row ->
-                            DDayItemRow(row = row, onClick = { onItemClick(row.entry) })
-                            if (index != rows.lastIndex) {
+                        state.rows.forEachIndexed { index, row ->
+                            DDayItemRow(row = row, onClick = { onItemClick(row) })
+                            if (index != state.rows.lastIndex) {
                                 RowDivider()
                             }
                         }
@@ -126,8 +95,7 @@ private fun DDayTopBar() {
 }
 
 @Composable
-private fun DDayItemRow(row: DDayRow, onClick: () -> Unit) {
-    val entry = row.entry
+private fun DDayItemRow(row: DDayRowUi, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -135,20 +103,18 @@ private fun DDayItemRow(row: DDayRow, onClick: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        DDayBadge(dDayLabel(row.days))
+        DDayBadge(row.dDayText)
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(entry.title, style = SalimType.bodyLg, color = SalimTokens.TextPrimary)
+                Text(row.title, style = SalimType.bodyLg, color = SalimTokens.TextPrimary)
                 // 자동 반영 항목(생일/기념일)은 이 탭에서 수정 불가 — 출처를 라벨로 구분 (PRD 6.)
-                if (entry.isAuto) AutoTag()
+                if (row.isAuto) AutoTag()
             }
             Text(
-                formatDotDate(row.targetMillis).let {
-                    if (entry.repeatYearly) "$it · 매년 반복" else it
-                },
+                if (row.repeatYearly) "${row.dateText} · 매년 반복" else row.dateText,
                 style = SalimType.bodySm,
                 color = SalimTokens.TextMuted,
             )
@@ -192,14 +158,24 @@ private fun EmptyState() {
 }
 
 // ---------------------------------------------------------------------------
-// 프리뷰
+// 프리뷰 (ViewModel 없이 DDayContent만)
 // ---------------------------------------------------------------------------
 
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
 private fun DDayScreenPreview() {
     SalimTheme {
-        DDayScreen(modifier = Modifier.background(SalimTokens.Background))
+        DDayContent(
+            state = DDayListUiState(
+                rows = listOf(
+                    DDayRowUi("1", "결혼기념일", "2026.08.31", "D-11", isAuto = true, repeatYearly = true),
+                    DDayRowUi("2", "제주 여행", "2026.09.15", "D-26", isAuto = false, repeatYearly = false),
+                    DDayRowUi("3", "이사", "2026.11.20", "D-92", isAuto = false, repeatYearly = false),
+                ),
+            ),
+            modifier = Modifier.background(SalimTokens.Background),
+            onItemClick = {},
+        )
     }
 }
 
@@ -207,9 +183,10 @@ private fun DDayScreenPreview() {
 @Composable
 private fun DDayScreenEmptyPreview() {
     SalimTheme {
-        DDayScreen(
+        DDayContent(
+            state = DDayListUiState(),
             modifier = Modifier.background(SalimTokens.Background),
-            state = DDayUiState(items = emptyList()),
+            onItemClick = {},
         )
     }
 }
