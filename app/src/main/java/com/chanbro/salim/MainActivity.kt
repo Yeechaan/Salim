@@ -1,5 +1,6 @@
 package com.chanbro.salim
 
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -24,21 +25,31 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import dagger.hilt.android.AndroidEntryPoint
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.chanbro.salim.core.ui.theme.SalimTheme
 import com.chanbro.salim.core.ui.theme.SalimTokens
 import com.chanbro.salim.ui.common.SalimBottomBar
 import com.chanbro.salim.ui.common.SalimTab
 import com.chanbro.salim.ui.common.SalimType
+import com.chanbro.salim.ui.dday.DDayEntry
+import com.chanbro.salim.ui.dday.DDayInputScreen
 import com.chanbro.salim.ui.dday.DDayScreen
 import com.chanbro.salim.ui.expense.ExpenseInputScreen
 import com.chanbro.salim.ui.expense.ExpenseScreen
 import com.chanbro.salim.ui.home.HomeScreen
 
 private const val ROUTE_EXPENSE_INPUT = "expense_input"
+private const val ROUTE_DDAY_INPUT = "dday_input"
+private const val ROUTE_DDAY_EDIT = "dday_edit/{title}/{date}/{repeat}"
+
+// TODO: 데이터 계층 도입 후 ddayId만 넘기도록 교체
+private fun ddayEditRoute(entry: DDayEntry): String =
+    "dday_edit/${Uri.encode(entry.title)}/${Uri.encode(entry.date)}/${entry.repeatYearly}"
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -93,8 +104,7 @@ private fun SalimApp() {
                 }
                 SalimTab.DDay.route -> {
                     FloatingActionButton(
-                        // TODO: 디데이 추가 화면(dday.md 6-2) 구현 후 해당 route로 연결
-                        onClick = {},
+                        onClick = { navController.navigate(ROUTE_DDAY_INPUT) },
                         containerColor = SalimTokens.Accent,
                         contentColor = Color.White,
                     ) {
@@ -114,8 +124,43 @@ private fun SalimApp() {
                 ExpenseScreen(onItemClick = { navController.navigate(ROUTE_EXPENSE_INPUT) })
             }
             composable(SalimTab.Schedule.route) { PlaceholderScreen(SalimTab.Schedule.label) }
-            composable(SalimTab.DDay.route) { DDayScreen() }
+            composable(SalimTab.DDay.route) {
+                DDayScreen(
+                    onItemClick = { entry ->
+                        // 자동 반영 항목(생일/기념일)은 설정 > 프로필에서만 수정 (PRD 6.)
+                        // TODO: 자동 항목 탭 시 안내/프로필 이동 흐름 확정 필요 (dday.md 6-1)
+                        if (!entry.isAuto) navController.navigate(ddayEditRoute(entry))
+                    },
+                )
+            }
             composable(SalimTab.Settings.route) { PlaceholderScreen(SalimTab.Settings.label) }
+            composable(ROUTE_DDAY_INPUT) {
+                DDayInputScreen(
+                    onClose = { navController.popBackStack() },
+                    onSave = { navController.popBackStack() },
+                )
+            }
+            composable(
+                ROUTE_DDAY_EDIT,
+                arguments = listOf(
+                    navArgument("title") { type = NavType.StringType },
+                    navArgument("date") { type = NavType.StringType },
+                    navArgument("repeat") { type = NavType.BoolType },
+                ),
+            ) { entry ->
+                val args = entry.arguments
+                DDayInputScreen(
+                    onClose = { navController.popBackStack() },
+                    onSave = { navController.popBackStack() },
+                    initial = DDayEntry(
+                        title = args?.getString("title").orEmpty(),
+                        date = args?.getString("date").orEmpty(),
+                        dDay = "",
+                        repeatYearly = args?.getBoolean("repeat") == true,
+                    ),
+                    onDelete = { navController.popBackStack() },
+                )
+            }
             composable(ROUTE_EXPENSE_INPUT) {
                 ExpenseInputScreen(
                     onClose = { navController.popBackStack() },

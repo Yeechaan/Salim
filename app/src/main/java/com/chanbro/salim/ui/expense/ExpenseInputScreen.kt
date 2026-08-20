@@ -1,7 +1,6 @@
 package com.chanbro.salim.ui.expense
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,7 +8,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -20,17 +18,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
-import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -54,15 +47,17 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.chanbro.salim.core.ui.theme.SalimTheme
 import com.chanbro.salim.core.ui.theme.SalimTokens
+import com.chanbro.salim.ui.common.DatePickerModal
+import com.chanbro.salim.ui.common.FieldDivider
+import com.chanbro.salim.ui.common.FieldRow
 import com.chanbro.salim.ui.common.SalimCard
 import com.chanbro.salim.ui.common.SalimChip
 import com.chanbro.salim.ui.common.SalimType
+import com.chanbro.salim.ui.common.SaveButton
+import com.chanbro.salim.ui.common.formatDate
 import com.chanbro.salim.ui.common.formatThousands
-import java.text.SimpleDateFormat
+import com.chanbro.salim.ui.common.todayUtcMillis
 import java.util.Calendar
-import java.util.Date
-import java.util.Locale
-import java.util.TimeZone
 
 private val spenders = listOf("나", "배우자")
 private val quickCategories = listOf("식비", "카페", "교통", "문화/여가", "생활")
@@ -217,21 +212,6 @@ private fun AmountInput(digits: String, onDigitsChange: (String) -> Unit) {
 }
 
 @Composable
-private fun FieldRow(label: String, value: String, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 14.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(label, style = SalimType.bodyMd, color = SalimTokens.TextMuted)
-        Text(value, style = SalimType.bodyLg, color = SalimTokens.TextPrimary)
-    }
-}
-
-@Composable
 private fun ChipsField(
     label: String,
     options: List<String>,
@@ -302,68 +282,9 @@ private fun MemoField(memo: String, onMemoChange: (String) -> Unit) {
     }
 }
 
-@Composable
-private fun FieldDivider() {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(1.dp)
-            .background(SalimTokens.Divider),
-    )
-}
-
-@Composable
-private fun SaveButton(enabled: Boolean, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(horizontal = 20.dp, vertical = 12.dp),
-    ) {
-        Button(
-            onClick = onClick,
-            enabled = enabled,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(54.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = SalimTokens.Accent,
-                contentColor = androidx.compose.ui.graphics.Color.White,
-                disabledContainerColor = SalimTokens.ProgressTrack,
-                disabledContentColor = SalimTokens.TextMuted,
-            ),
-        ) {
-            Text("저장하기", style = SalimType.bodyLg.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold))
-        }
-    }
-}
-
 // ---------------------------------------------------------------------------
 // 날짜 / 시간 피커 (Material3)
 // ---------------------------------------------------------------------------
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun DatePickerModal(
-    initialMillis: Long,
-    onConfirm: (Long) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val state = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
-    DatePickerDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            TextButton(onClick = { state.selectedDateMillis?.let(onConfirm) ?: onDismiss() }) {
-                Text("확인", color = SalimTokens.Accent)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("취소", color = SalimTokens.TextMuted) }
-        },
-    ) {
-        DatePicker(state = state)
-    }
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -393,22 +314,8 @@ private fun TimePickerModal(
     )
 }
 
-// UTC 자정 기준(Material3 DatePicker 규약)으로 오늘 날짜의 millis.
-private fun todayUtcMillis(): Long {
-    val local = Calendar.getInstance()
-    return Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
-        clear()
-        set(local.get(Calendar.YEAR), local.get(Calendar.MONTH), local.get(Calendar.DAY_OF_MONTH))
-    }.timeInMillis
-}
-
 private fun nowHour(): Int = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
 private fun nowMinute(): Int = Calendar.getInstance().get(Calendar.MINUTE)
-
-private fun formatDate(utcMillis: Long): String =
-    SimpleDateFormat("yyyy년 M월 d일", Locale.KOREAN).apply {
-        timeZone = TimeZone.getTimeZone("UTC")
-    }.format(Date(utcMillis))
 
 private fun formatTime(hour24: Int, minute: Int): String {
     val ampm = if (hour24 < 12) "오전" else "오후"
