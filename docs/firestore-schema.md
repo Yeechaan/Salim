@@ -146,9 +146,12 @@
 | 필드 | 타입 | 설명 |
 |---|---|---|
 | coupleId | String? | 연결된 couples 문서 참조, 미연결 시 null |
-| birthday / anniversary | Timestamp? | 프로필 정보, ddays에 자동 반영되는 source |
+| birthdayMillis / anniversaryMillis | Number? | 생일/기념일 (UTC 자정 millis). ddays의 AUTO 항목이 파생되는 source — ddays 컬렉션에 쓰지 않는다 |
 | fcmToken | String? | 푸시 발송용 |
 | notificationSettings | Map | 알림 종류별 on/off (PRD 8. 알림 표 기준) |
+
+- 날짜를 Timestamp가 아닌 millis로 두는 이유는 ddays/schedules와 같다 — 시각 없는 '날짜'라서 타임존 해석이 끼어들 여지를 없앤다.
+- 현재 구현은 다른 기능과 동일하게 시뮬레이션 경로 `users/demo` 문서를 사용하고, 프로필 필드만 merge로 쓴다.
 
 ## 보안 규칙 메모 (설계 의도 — 규칙 파일은 별도 작성)
 - `users/{userId}/**`: 본인만 read/write.

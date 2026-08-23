@@ -46,7 +46,9 @@ import com.chanbro.salim.core.ui.theme.SalimTokens
 import com.chanbro.salim.ui.common.DDayBadge
 import com.chanbro.salim.ui.common.MonthPickerSheet
 import com.chanbro.salim.ui.common.MonthSelector
+import com.chanbro.salim.ui.common.BudgetInputSheet
 import com.chanbro.salim.ui.common.SalimCard
+import com.chanbro.salim.ui.common.SalimTab
 import com.chanbro.salim.ui.common.SalimType
 import com.chanbro.salim.ui.common.categoryVisual
 import com.chanbro.salim.ui.dday.DDayListViewModel
@@ -269,7 +271,19 @@ private fun UpcomingDDayCard(viewModel: DDayListViewModel = hiltViewModel()) {
 
     SalimCard(cornerRadius = 24.dp) {
         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text("다가오는 디데이", style = SalimType.headlineSm, color = SalimTokens.TextPrimary)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                // 하단 탭바와 같은 아이콘을 참조해 홈 카드 ↔ 디데이 탭을 같은 기호로 묶는다
+                Icon(
+                    SalimTab.DDay.icon,
+                    contentDescription = null,
+                    tint = SalimTokens.Accent,
+                    modifier = Modifier.size(20.dp),
+                )
+                Text("디데이", style = SalimType.headlineSm, color = SalimTokens.TextPrimary)
+            }
             if (upcoming.isEmpty()) {
                 Text("디데이를 추가해보세요", style = SalimType.bodyMd, color = SalimTokens.TextMuted)
             } else {

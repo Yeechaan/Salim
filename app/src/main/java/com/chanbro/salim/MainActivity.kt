@@ -44,6 +44,8 @@ import com.chanbro.salim.ui.dday.DDayScreen
 import com.chanbro.salim.ui.expense.ExpenseInputScreen
 import com.chanbro.salim.ui.expense.ExpenseScreen
 import com.chanbro.salim.ui.home.HomeScreen
+import com.chanbro.salim.ui.settings.ProfileEditScreen
+import com.chanbro.salim.ui.settings.SettingsScreen
 import com.chanbro.salim.ui.schedule.ScheduleInputScreen
 import com.chanbro.salim.ui.schedule.ScheduleScreen
 import com.chanbro.salim.ui.schedule.todayUtc
@@ -53,6 +55,7 @@ private const val ROUTE_DDAY_INPUT = "dday_input"
 private const val ROUTE_DDAY_EDIT = "dday_edit/{ddayId}"
 private const val ROUTE_SCHEDULE_INPUT = "schedule_input/{dateMillis}"
 private const val ROUTE_SCHEDULE_EDIT = "schedule_edit/{scheduleId}"
+private const val ROUTE_PROFILE_EDIT = "profile_edit"
 
 private fun scheduleInputRoute(dateMillis: Long): String = "schedule_input/$dateMillis"
 private fun scheduleEditRoute(scheduleId: String): String =
@@ -159,7 +162,17 @@ private fun SalimApp() {
                     },
                 )
             }
-            composable(SalimTab.Settings.route) { PlaceholderScreen(SalimTab.Settings.label) }
+            composable(SalimTab.Settings.route) {
+                SettingsScreen(
+                    onProfileClick = { navController.navigate(ROUTE_PROFILE_EDIT) },
+                )
+            }
+            composable(ROUTE_PROFILE_EDIT) {
+                ProfileEditScreen(
+                    onClose = { navController.popBackStack() },
+                    onDone = { navController.popBackStack() },
+                )
+            }
             composable(ROUTE_DDAY_INPUT) {
                 DDayInputScreen(
                     onClose = { navController.popBackStack() },
