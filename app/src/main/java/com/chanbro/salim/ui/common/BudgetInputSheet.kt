@@ -1,4 +1,4 @@
-package com.chanbro.salim.ui.home
+package com.chanbro.salim.ui.common
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,12 +25,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.chanbro.salim.core.ui.theme.SalimTokens
-import com.chanbro.salim.ui.common.SalimType
-import com.chanbro.salim.ui.common.SaveButton
-import com.chanbro.salim.ui.common.ThousandsTransformation
-import com.chanbro.salim.ui.common.parseAmount
 
 /**
+ * 월 예산 설정 바텀시트 — 홈 예산 카드 / 설정 > 달별 예산 공용.
  * 이번 달 예산 설정 (PRD 3. 홈 "이번 달 예산").
  * 예산 카드를 탭하면 열린다.
  */

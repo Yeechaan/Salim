@@ -10,10 +10,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,6 +31,7 @@ import com.chanbro.salim.core.ui.theme.SalimTheme
 import com.chanbro.salim.core.ui.theme.SalimTokens
 import com.chanbro.salim.ui.common.DDayBadge
 import com.chanbro.salim.ui.common.SalimCard
+import com.chanbro.salim.ui.common.SalimTab
 import com.chanbro.salim.ui.common.SalimType
 
 // ---------------------------------------------------------------------------
@@ -87,8 +90,16 @@ private fun DDayTopBar() {
                 .statusBarsPadding()
                 .height(60.dp)
                 .padding(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // 하단 탭바와 같은 아이콘을 참조해 탭 ↔ 상단 바를 같은 기호로 묶는다
+            Icon(
+                SalimTab.DDay.icon,
+                contentDescription = null,
+                tint = SalimTokens.Accent,
+                modifier = Modifier.size(20.dp),
+            )
             Text("디데이", style = SalimType.headlineSm, color = SalimTokens.TextPrimary)
         }
     }

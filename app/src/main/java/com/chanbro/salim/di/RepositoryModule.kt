@@ -3,10 +3,12 @@ package com.chanbro.salim.di
 import com.chanbro.salim.data.repository.FirestoreBudgetRepository
 import com.chanbro.salim.data.repository.FirestoreDDayRepository
 import com.chanbro.salim.data.repository.FirestoreExpenseRepository
+import com.chanbro.salim.data.repository.FirestoreProfileRepository
 import com.chanbro.salim.data.repository.FirestoreScheduleRepository
 import com.chanbro.salim.domain.repository.BudgetRepository
 import com.chanbro.salim.domain.repository.DDayRepository
 import com.chanbro.salim.domain.repository.ExpenseRepository
+import com.chanbro.salim.domain.repository.ProfileRepository
 import com.chanbro.salim.domain.repository.ScheduleRepository
 import com.google.firebase.firestore.FirebaseFirestore
 import dagger.Binds
@@ -35,6 +37,10 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindScheduleRepository(impl: FirestoreScheduleRepository): ScheduleRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindProfileRepository(impl: FirestoreProfileRepository): ProfileRepository
 
     companion object {
         @Provides

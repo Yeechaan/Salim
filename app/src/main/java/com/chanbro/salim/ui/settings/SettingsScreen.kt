@@ -1,0 +1,258 @@
+package com.chanbro.salim.ui.settings
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.People
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.chanbro.salim.core.ui.theme.SalimTheme
+import com.chanbro.salim.core.ui.theme.SalimTokens
+import com.chanbro.salim.ui.common.BudgetInputSheet
+import com.chanbro.salim.ui.common.SalimCard
+import com.chanbro.salim.ui.common.SalimType
+
+// ---------------------------------------------------------------------------
+// 설정 (settings.md 7) — 탭 랜딩 화면
+//
+// 연결 상태 / 연결 해제 / 로그아웃 / 회원탈퇴는 인증·커플 연결(PRD 1)이 아직 없어
+// 비활성 상태로만 노출한다. 동작하는 것처럼 보이지 않도록 muted 처리하고 탭도 막는다.
+// ---------------------------------------------------------------------------
+
+@Composable
+fun SettingsScreen(
+    modifier: Modifier = Modifier,
+    onProfileClick: () -> Unit = {},
+    viewModel: SettingsViewModel = hiltViewModel(),
+) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    var showBudgetSheet by rememberSaveable { mutableStateOf(false) }
+
+    SettingsContent(
+        state = state,
+        modifier = modifier,
+        onProfileClick = onProfileClick,
+        onBudgetClick = { showBudgetSheet = true },
+    )
+
+    if (showBudgetSheet) {
+        BudgetInputSheet(
+            year = state.year,
+            month = state.month,
+            initialAmount = state.budgetAmount,
+            onDismiss = { showBudgetSheet = false },
+            onConfirm = { amount ->
+                viewModel.setBudget(amount)
+                showBudgetSheet = false
+            },
+        )
+    }
+}
+
+@Composable
+private fun SettingsContent(
+    state: SettingsUiState,
+    modifier: Modifier = Modifier,
+    onProfileClick: () -> Unit,
+    onBudgetClick: () -> Unit,
+) {
+    Column(modifier = modifier.fillMaxSize()) {
+        SettingsTopBar()
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            ConnectionCard()
+
+            SettingsGroup("일반") {
+                SettingsRow(
+                    label = "프로필 수정",
+                    value = "생일 · 기념일",
+                    onClick = onProfileClick,
+                )
+                RowDivider()
+                SettingsRow(
+                    label = "가계부 카테고리 수정",
+                    value = "준비 중",
+                    enabled = false,
+                )
+                RowDivider()
+                SettingsRow(
+                    label = "달별 예산 설정",
+                    value = state.budgetText,
+                    onClick = onBudgetClick,
+                )
+                RowDivider()
+                SettingsRow(
+                    label = "알림 설정",
+                    value = "준비 중",
+                    enabled = false,
+                )
+            }
+
+            SettingsGroup("연결") {
+                SettingsRow(label = "연결 해제", value = "준비 중", enabled = false)
+            }
+
+            // 실수로 누르지 않도록 목록과 시각적으로 분리 (settings.md 5.)
+            Column(
+                modifier = Modifier.padding(top = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text("로그아웃", style = SalimType.bodyMd, color = SalimTokens.TextMuted)
+                Text("회원탈퇴", style = SalimType.labelSm, color = SalimTokens.TextMuted)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsTopBar() {
+    Surface(color = SalimTokens.Background) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .height(60.dp)
+                .padding(horizontal = 20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("설정", style = SalimType.headlineSm, color = SalimTokens.TextPrimary)
+        }
+    }
+}
+
+/** 미연결 상태 카드. 커플 연결 기능이 붙기 전까지는 안내만 한다. (settings.md 2.) */
+@Composable
+private fun ConnectionCard() {
+    SalimCard(cornerRadius = 24.dp) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(SalimTokens.AccentSoft),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Filled.People,
+                    contentDescription = null,
+                    tint = SalimTokens.Accent,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("상대방을 연결해보세요", style = SalimType.bodyLg, color = SalimTokens.TextPrimary)
+                Text("연결 기능은 준비 중이에요", style = SalimType.bodySm, color = SalimTokens.TextMuted)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsGroup(title: String, content: @Composable () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(title, style = SalimType.labelMd, color = SalimTokens.TextMuted)
+        SalimCard(cornerRadius = 20.dp, contentPadding = 4.dp) { content() }
+    }
+}
+
+@Composable
+private fun SettingsRow(
+    label: String,
+    value: String,
+    enabled: Boolean = true,
+    onClick: () -> Unit = {},
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(horizontal = 16.dp, vertical = 16.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            label,
+            style = SalimType.bodyLg,
+            color = if (enabled) SalimTokens.TextPrimary else SalimTokens.TextMuted,
+        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(value, style = SalimType.bodyMd, color = SalimTokens.TextMuted)
+            if (enabled) {
+                Icon(
+                    Icons.Filled.ChevronRight,
+                    contentDescription = null,
+                    tint = SalimTokens.TextMuted,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RowDivider() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .height(1.dp)
+            .background(SalimTokens.Divider),
+    )
+}
+
+// ---------------------------------------------------------------------------
+// 프리뷰
+// ---------------------------------------------------------------------------
+
+@Preview(showBackground = true, showSystemUi = true)
+@Composable
+private fun SettingsScreenPreview() {
+    SalimTheme {
+        SettingsContent(
+            state = SettingsUiState(year = 2026, month = 8, budgetAmount = 1_200_000),
+            modifier = Modifier.background(SalimTokens.Background),
+            onProfileClick = {},
+            onBudgetClick = {},
+        )
+    }
+}
