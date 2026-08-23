@@ -284,19 +284,23 @@ fun SalimChip(
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    // 한 줄에 칩을 여러 개 균등 폭으로 깔 때(예산 빠른 금액 5개) 좁은 패딩/작은 글자로 줄여 쓸 수 있다.
+    horizontalPadding: Dp = 18.dp,
+    textStyle: TextStyle = SalimType.bodyMd,
 ) {
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(percent = 50))
             .background(if (selected) SalimTokens.Accent else SalimTokens.AccentSoft)
             .clickable(onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 10.dp),
+            .padding(horizontal = horizontalPadding, vertical = 10.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             label,
-            style = SalimType.bodyMd.copy(fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium),
+            style = textStyle.copy(fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium),
             color = if (selected) Color.White else SalimTokens.Accent,
+            maxLines = 1,
         )
     }
 }
