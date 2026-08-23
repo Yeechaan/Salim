@@ -11,6 +11,7 @@
 | 미연결 | `users/{userId}/expenses`, `users/{userId}/categories`, `users/{userId}/budget` |
 | 연결 | `couples/{coupleId}/expenses`, `couples/{coupleId}/categories`, `couples/{coupleId}/budget` |
 
+- 경로 선택은 `data/repository/UserScope`가 전담한다. 저장소들은 uid를 직접 알지 못하고 `UserScope.uid`(Firebase Auth 상태 스트림)와 `requireUserDoc()`만 쓴다 — 연결 기능이 들어와도 저장소 4개는 손대지 않고 `UserScope`만 분기시키면 된다.
 - 연결 성사 시 기존 개인 데이터는 **이관하지 않는다**. 개인 데이터는 그대로 유지되어 본인만 열람하고, 연결 이후 신규 기록만 공동 경로에 쓴다. (PRD 1 "연결 전 데이터는 개인 데이터로 유지, 연결 후 데이터만 공동으로 전환")
 
 ## couples/{coupleId}
@@ -65,7 +66,7 @@
 - 캘린더가 월 단위로 그려지므로 조회도 월 단위(`dateMillis` 범위 쿼리 + 오름차순)로 한다.
 - 날짜와 시각을 한 값으로 합치지 않고 분리한다 — 종일 여부를 `minuteOfDay` 유무로만 표현할 수 있고, 날짜 그룹핑도 추가 계산 없이 된다.
 - 반복 일정은 1차 범위에서 제외 (wireframe/schedule.md 5-2).
-- 현재 구현은 다른 기능과 동일하게 시뮬레이션 경로 `users/demo/schedules`를 사용한다.
+- 현재 구현 경로는 `users/{uid}/schedules` (미연결 개인 경로). 연결 도입 시 `UserScope`에서 `couples/{coupleId}`로 분기한다.
 
 ### {budget}/{yyyy-MM}
 월 예산. (PRD 3. 홈 "이번 달 예산") — `users/{userId}/budget` / `couples/{coupleId}/budget` **공통 필드 스키마**.
@@ -91,7 +92,7 @@
 
 - 정렬(가까운 순)은 저장 시점이 아니라 표시 시점에 계산한다. 매년 반복 항목은 저장된 날짜와 다음 기념일이 다르기 때문에 Firestore `orderBy`로는 정렬할 수 없다.
 - AUTO 항목은 `users/{userId}`의 birthday/anniversary에서 파생된다. 디데이 탭에서 수정·삭제 불가.
-- 가계부와 동일하게, 현재 구현은 시뮬레이션 경로 `users/demo/ddays`를 사용한다.
+- 가계부와 동일하게, 현재 구현 경로는 `users/{uid}/ddays` (미연결 개인 경로).
 
 ### {categories}/{categoryId}
 가계부 카테고리. (PRD 7. 설정 - 카테고리 수정) — `users/{userId}/categories` / `couples/{coupleId}/categories` **공통 필드 스키마**.
@@ -151,9 +152,9 @@
 | notificationSettings | Map | 알림 종류별 on/off (PRD 8. 알림 표 기준) |
 
 - 날짜를 Timestamp가 아닌 millis로 두는 이유는 ddays/schedules와 같다 — 시각 없는 '날짜'라서 타임존 해석이 끼어들 여지를 없앤다.
-- 현재 구현은 다른 기능과 동일하게 시뮬레이션 경로 `users/demo` 문서를 사용하고, 프로필 필드만 merge로 쓴다.
+- 로그인한 사용자의 `users/{uid}` 문서에 프로필 필드만 merge로 쓴다. (같은 문서에 로그인/계정 필드가 함께 살기 때문)
 
-## 보안 규칙 메모 (설계 의도 — 규칙 파일은 별도 작성)
+## 보안 규칙 (`firestore.rules`에 반영됨)
 - `users/{userId}/**`: 본인만 read/write.
 - `couples/{coupleId}/**`: `memberIds`에 포함된 uid만 read/write.
 - `couples/{coupleId}`에 `deletedAt`가 있으면 신규 쓰기 차단(유예기간), 열람만 허용. (PRD 9)

@@ -18,9 +18,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.People
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,10 +31,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.chanbro.salim.R
 import com.chanbro.salim.core.ui.theme.SalimTheme
 import com.chanbro.salim.core.ui.theme.SalimTokens
 import com.chanbro.salim.ui.common.BudgetInputSheet
@@ -42,8 +46,9 @@ import com.chanbro.salim.ui.common.SalimType
 // ---------------------------------------------------------------------------
 // 설정 (settings.md 7) — 탭 랜딩 화면
 //
-// 연결 상태 / 연결 해제 / 로그아웃 / 회원탈퇴는 인증·커플 연결(PRD 1)이 아직 없어
-// 비활성 상태로만 노출한다. 동작하는 것처럼 보이지 않도록 muted 처리하고 탭도 막는다.
+// 로그아웃은 구글 로그인(PRD 1)이 붙으면서 실제로 동작한다.
+// 연결 상태 / 연결 해제는 커플 연결(PRD 9)이, 회원탈퇴는 30일 유예 정책상 Cloud Functions가
+// 아직 없어 비활성으로만 노출한다. 동작하는 것처럼 보이지 않도록 muted 처리하고 탭도 막는다.
 // ---------------------------------------------------------------------------
 
 @Composable
@@ -54,13 +59,25 @@ fun SettingsScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var showBudgetSheet by rememberSaveable { mutableStateOf(false) }
+    var confirmingSignOut by rememberSaveable { mutableStateOf(false) }
 
     SettingsContent(
         state = state,
         modifier = modifier,
         onProfileClick = onProfileClick,
         onBudgetClick = { showBudgetSheet = true },
+        onSignOutClick = { confirmingSignOut = true },
     )
+
+    if (confirmingSignOut) {
+        SignOutConfirmDialog(
+            onConfirm = {
+                confirmingSignOut = false
+                viewModel.onSignOut()
+            },
+            onDismiss = { confirmingSignOut = false },
+        )
+    }
 
     if (showBudgetSheet) {
         BudgetInputSheet(
@@ -82,6 +99,7 @@ private fun SettingsContent(
     modifier: Modifier = Modifier,
     onProfileClick: () -> Unit,
     onBudgetClick: () -> Unit,
+    onSignOutClick: () -> Unit,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
         SettingsTopBar()
@@ -126,15 +144,58 @@ private fun SettingsContent(
 
             // 실수로 누르지 않도록 목록과 시각적으로 분리 (settings.md 5.)
             Column(
-                modifier = Modifier.padding(top = 12.dp),
+                // fillMaxWidth가 없으면 Column이 콘텐츠 폭으로 줄어들어 가운데 정렬이 먹지 않는다.
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text("로그아웃", style = SalimType.bodyMd, color = SalimTokens.TextMuted)
-                Text("회원탈퇴", style = SalimType.labelSm, color = SalimTokens.TextMuted)
+                Text(
+                    text = stringResource(R.string.settings_sign_out),
+                    style = SalimType.bodyMd,
+                    color = SalimTokens.TextPrimary,
+                    modifier = Modifier
+                        .clickable(onClick = onSignOutClick)
+                        .padding(horizontal = 24.dp, vertical = 4.dp),
+                )
+                // 회원탈퇴는 유예기간(30일) 처리가 필요해 아직 비활성 (PRD 9.)
+                Text(
+                    text = stringResource(R.string.settings_withdraw),
+                    style = SalimType.labelSm,
+                    color = SalimTokens.TextMuted,
+                )
             }
         }
     }
+}
+
+@Composable
+private fun SignOutConfirmDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(stringResource(R.string.settings_sign_out_confirm), style = SalimType.titleLg)
+        },
+        text = {
+            Text(
+                stringResource(R.string.settings_sign_out_confirm_body),
+                style = SalimType.bodyMd,
+                color = SalimTokens.TextMuted,
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(stringResource(R.string.common_confirm), color = SalimTokens.Accent)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.common_cancel), color = SalimTokens.TextMuted)
+            }
+        },
+        containerColor = SalimTokens.CardSurface,
+    )
 }
 
 @Composable
@@ -253,6 +314,7 @@ private fun SettingsScreenPreview() {
             modifier = Modifier.background(SalimTokens.Background),
             onProfileClick = {},
             onBudgetClick = {},
+            onSignOutClick = {},
         )
     }
 }

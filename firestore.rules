@@ -1,10 +1,42 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // 개발용: 모든 사용자에게 읽기/쓰기 허용
-    // TODO: 프로덕션 배포 전 인증 규칙 추가
-    match /{document=**} {
-      allow read, write: if true;
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // 개인(미연결) 데이터 — 본인만 read/write.
+    // users/{uid}/expenses|schedules|ddays|budget 이 여기에 걸린다.
+    match /users/{userId} {
+      allow read, write: if signedIn() && request.auth.uid == userId;
+
+      match /{document=**} {
+        allow read, write: if signedIn() && request.auth.uid == userId;
+      }
+    }
+
+    // 공동(연결) 데이터 — memberIds에 포함된 uid만 접근. (PRD 9. 상대방 연결)
+    // 아직 이 경로를 쓰는 코드는 없지만, 유예기간 정책이 규칙에 의존하므로 함께 정의한다.
+    match /couples/{coupleId} {
+      function couple() {
+        return get(/databases/$(database)/documents/couples/$(coupleId)).data;
+      }
+      function isMember() {
+        return signedIn() && request.auth.uid in couple().memberIds;
+      }
+      // deletedAt이 있으면 연결 해제/탈퇴 유예기간 중 → 열람만 허용, 신규 쓰기 차단.
+      function notDeleted() {
+        return couple().deletedAt == null;
+      }
+
+      allow read: if signedIn() && request.auth.uid in resource.data.memberIds;
+      allow write: if isMember() && notDeleted();
+
+      match /{document=**} {
+        allow read: if isMember();
+        allow write: if isMember() && notDeleted();
+      }
     }
   }
 }

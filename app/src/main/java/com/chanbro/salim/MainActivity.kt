@@ -8,6 +8,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,17 +18,19 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import dagger.hilt.android.AndroidEntryPoint
-import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -38,18 +41,21 @@ import com.chanbro.salim.core.ui.theme.SalimTheme
 import com.chanbro.salim.core.ui.theme.SalimTokens
 import com.chanbro.salim.ui.common.SalimBottomBar
 import com.chanbro.salim.ui.common.SalimTab
-import com.chanbro.salim.ui.common.SalimType
 import com.chanbro.salim.ui.dday.DDayInputScreen
 import com.chanbro.salim.ui.dday.DDayScreen
 import com.chanbro.salim.ui.expense.ExpenseInputScreen
 import com.chanbro.salim.ui.expense.ExpenseScreen
+import com.chanbro.salim.ui.auth.LoginScreen
 import com.chanbro.salim.ui.home.HomeScreen
+import com.chanbro.salim.ui.onboarding.OnboardingScreen
 import com.chanbro.salim.ui.settings.ProfileEditScreen
 import com.chanbro.salim.ui.settings.SettingsScreen
 import com.chanbro.salim.ui.schedule.ScheduleInputScreen
 import com.chanbro.salim.ui.schedule.ScheduleScreen
 import com.chanbro.salim.ui.schedule.todayUtc
 
+private const val ROUTE_ONBOARDING = "onboarding"
+private const val ROUTE_LOGIN = "login"
 private const val ROUTE_EXPENSE_INPUT = "expense_input"
 private const val ROUTE_DDAY_INPUT = "dday_input"
 private const val ROUTE_DDAY_EDIT = "dday_edit/{ddayId}"
@@ -77,7 +83,31 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun SalimApp() {
+private fun SalimApp(appViewModel: AppViewModel = hiltViewModel()) {
+    val appState by appViewModel.uiState.collectAsStateWithLifecycle()
+
+    // 로그인 여부가 확정되기 전에는 NavHost를 만들지 않는다 — 시작 목적지가 한 번만 정해져
+    // 온보딩/로그인/홈이 번갈아 깜빡이는 것을 막는다.
+    if (appState is AppUiState.Loading) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(SalimTokens.Background),
+        )
+    } else {
+        SalimNavGraph(
+            appState = appState,
+            onOnboardingFinished = appViewModel::onOnboardingFinished,
+        )
+    }
+}
+
+/** 진입 상태가 확정된 뒤의 본 화면 그래프. */
+@Composable
+private fun SalimNavGraph(
+    appState: AppUiState,
+    onOnboardingFinished: () -> Unit,
+) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
@@ -88,6 +118,20 @@ private fun SalimApp() {
     val tabRoutes = SalimTab.entries.map { it.route }.toSet()
     val onTabRoute = currentRoute in tabRoutes
     val selectedTab = SalimTab.entries.firstOrNull { it.route == currentRoute } ?: SalimTab.Home
+
+    // 시작 목적지는 최초 확정 값으로 한 번만 정하고, 이후 상태 변화(로그인 성공/로그아웃)는
+    // 아래 LaunchedEffect가 이동으로 반영한다.
+    val startDestination = remember { appState.route() }
+    var lastHandledState by remember { mutableStateOf(appState) }
+    LaunchedEffect(appState) {
+        if (appState != lastHandledState) {
+            lastHandledState = appState
+            navController.navigate(appState.route()) {
+                popUpTo(0) { inclusive = true }
+                launchSingleTop = true
+            }
+        }
+    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -140,9 +184,11 @@ private fun SalimApp() {
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = SalimTab.Home.route,
+            startDestination = startDestination,
             modifier = Modifier.padding(innerPadding),
         ) {
+            composable(ROUTE_ONBOARDING) { OnboardingScreen(onFinish = onOnboardingFinished) }
+            composable(ROUTE_LOGIN) { LoginScreen() }
             composable(SalimTab.Home.route) { HomeScreen() }
             composable(SalimTab.Expense.route) {
                 ExpenseScreen(onItemClick = { navController.navigate(ROUTE_EXPENSE_INPUT) })
@@ -219,17 +265,22 @@ private fun SalimApp() {
     }
 }
 
+/**
+ * 탭 전환. 그래프 시작 목적지가 아니라 홈 탭을 기준으로 되감는다 —
+ * 미로그인 진입 시 시작 목적지가 로그인 화면이라, 그래프 시작점을 쓰면
+ * 로그인 후 탭을 옮길 때마다 백스택이 쌓인다.
+ */
 private fun androidx.navigation.NavHostController.navigateToTab(tab: SalimTab) {
     navigate(tab.route) {
-        popUpTo(graph.findStartDestination().id) { saveState = true }
+        popUpTo(SalimTab.Home.route) { saveState = true }
         launchSingleTop = true
         restoreState = true
     }
 }
 
-@Composable
-private fun PlaceholderScreen(label: String) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text("$label 화면 준비 중", style = SalimType.bodyLg, color = SalimTokens.TextMuted)
-    }
+/** 진입 상태에 대응하는 시작 라우트. Loading은 NavHost를 만들기 전에 걸러진다. */
+private fun AppUiState.route(): String = when (this) {
+    AppUiState.Onboarding -> ROUTE_ONBOARDING
+    AppUiState.Login -> ROUTE_LOGIN
+    AppUiState.Main, AppUiState.Loading -> SalimTab.Home.route
 }
