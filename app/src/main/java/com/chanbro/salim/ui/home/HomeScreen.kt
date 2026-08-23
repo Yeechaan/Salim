@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -141,7 +142,28 @@ private fun HomeTopBar() {
 private fun BudgetCard(state: HomeUiState, onClick: () -> Unit) {
     SalimCard(cornerRadius = 24.dp, modifier = Modifier.clickable(onClick = onClick)) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("이번 달 예산", style = SalimType.labelMd, color = SalimTokens.TextMuted)
+            // 카드를 탭하면 예산을 고칠 수 있다는 표시 (아이콘 자체는 장식, 클릭 영역은 카드 전체)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("이번 달 예산", style = SalimType.labelMd, color = SalimTokens.TextMuted)
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(SalimTokens.AccentSoft),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Outlined.Edit,
+                        contentDescription = "예산 수정",
+                        tint = SalimTokens.Accent,
+                        modifier = Modifier.size(15.dp),
+                    )
+                }
+            }
             Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(state.spentText, style = SalimType.headlineMd, color = SalimTokens.TextPrimary)
                 val budgetText = state.budgetText
