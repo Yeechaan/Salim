@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.chanbro.salim.domain.model.Budget
 import com.chanbro.salim.domain.usecase.ObserveBudgetUseCase
 import com.chanbro.salim.domain.usecase.SaveBudgetUseCase
+import com.chanbro.salim.domain.usecase.SignOutUseCase
 import com.chanbro.salim.ui.common.formatThousands
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -29,6 +30,7 @@ data class SettingsUiState(
 class SettingsViewModel @Inject constructor(
     observeBudget: ObserveBudgetUseCase,
     private val saveBudget: SaveBudgetUseCase,
+    private val signOut: SignOutUseCase,
 ) : ViewModel() {
 
     // 설정의 "달별 예산"은 이번 달 기준으로 보여준다.
@@ -53,6 +55,11 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             saveBudget(Budget(yearMonth.first, yearMonth.second, amount))
         }
+    }
+
+    /** 로그아웃 후 화면 이동은 인증 게이트(AppViewModel)가 auth 상태를 보고 처리한다. */
+    fun onSignOut() {
+        viewModelScope.launch { signOut() }
     }
 }
 

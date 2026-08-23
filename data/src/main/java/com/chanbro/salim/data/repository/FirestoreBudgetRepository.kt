@@ -2,56 +2,58 @@ package com.chanbro.salim.data.repository
 
 import com.chanbro.salim.domain.model.Budget
 import com.chanbro.salim.domain.repository.BudgetRepository
-import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.DocumentReference
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Firestore 기반 월 예산 저장소. (현재 시뮬레이션용 기본 경로 사용)
+ * Firestore 기반 월 예산 저장소.
  *
- * 실제 배포:
+ * 경로는 UserScope가 정한다:
  * - 미연결: users/{uid}/budget/{yyyy-MM}
- * - 연결: couples/{coupleId}/budget/{yyyy-MM}
+ * - 연결: couples/{coupleId}/budget/{yyyy-MM} (PRD 9. 연결 도입 시 UserScope에서 분기)
  */
 @Singleton
 class FirestoreBudgetRepository @Inject constructor(
-    private val firestore: FirebaseFirestore,
+    private val userScope: UserScope,
 ) : BudgetRepository {
 
-    override fun observe(year: Int, month: Int): Flow<Budget?> = callbackFlow {
-        val listener = document(year, month).addSnapshotListener { snapshot, error ->
-            if (error != null) {
-                close(error)
-                return@addSnapshotListener
+    @OptIn(ExperimentalCoroutinesApi::class)
+    override fun observe(year: Int, month: Int): Flow<Budget?> =
+        userScope.uid.flatMapLatest { uid ->
+            if (uid == null) return@flatMapLatest flowOf(null)
+            callbackFlow {
+                val listener = document(userScope.userDoc(uid), year, month)
+                    .addSnapshotListener { snapshot, error ->
+                        if (error != null) {
+                            close(error)
+                            return@addSnapshotListener
+                        }
+                        val amount = snapshot?.getLong("amount")
+                        trySend(amount?.let { Budget(year, month, it) })
+                    }
+                awaitClose { listener.remove() }
             }
-            val amount = snapshot?.getLong("amount")
-            trySend(amount?.let { Budget(year, month, it) })
         }
-        awaitClose { listener.remove() }
-    }
 
     override suspend fun save(budget: Budget) {
-        document(budget.year, budget.month)
+        document(userScope.requireUserDoc(), budget.year, budget.month)
             .set(mapOf("amount" to budget.amount))
             .await()
     }
 
-    private fun document(year: Int, month: Int) = firestore
-        .collection("users")
-        .document(USER_ID)
+    private fun document(userDoc: DocumentReference, year: Int, month: Int) = userDoc
         .collection("budget")
         .document(documentId(year, month))
 
     /** 문서 id는 정렬 가능하도록 yyyy-MM. */
     private fun documentId(year: Int, month: Int): String =
         "%04d-%02d".format(year, month)
-
-    private companion object {
-        // TODO: 실제로는 FirebaseAuth.currentUser?.uid (다른 리포지토리와 동일)
-        const val USER_ID = "demo"
-    }
 }

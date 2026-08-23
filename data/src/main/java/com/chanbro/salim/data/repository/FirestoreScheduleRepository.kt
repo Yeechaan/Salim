@@ -3,12 +3,16 @@ package com.chanbro.salim.data.repository
 import com.chanbro.salim.domain.model.Schedule
 import com.chanbro.salim.domain.model.ScheduleType
 import com.chanbro.salim.domain.repository.ScheduleRepository
+import com.google.firebase.firestore.CollectionReference
+import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
-import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.tasks.await
 import java.util.Calendar
 import java.util.TimeZone
@@ -16,34 +20,39 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Firestore 기반 일정 저장소. (현재 시뮬레이션용 기본 경로 사용)
+ * Firestore 기반 일정 저장소.
  *
- * 실제 배포:
+ * 경로는 UserScope가 정한다:
  * - 미연결: users/{uid}/schedules
- * - 연결: couples/{coupleId}/schedules (Firestore Rules로 관리)
+ * - 연결: couples/{coupleId}/schedules (PRD 9. 연결 도입 시 UserScope에서 분기)
  */
 @Singleton
 class FirestoreScheduleRepository @Inject constructor(
-    private val firestore: FirebaseFirestore,
+    private val userScope: UserScope,
 ) : ScheduleRepository {
 
-    override fun observeMonth(year: Int, month: Int): Flow<List<Schedule>> = callbackFlow {
-        val startMillis = startOfMonth(year, month)
-        val endMillis = startOfMonth(year, month + 1)
+    @OptIn(ExperimentalCoroutinesApi::class)
+    override fun observeMonth(year: Int, month: Int): Flow<List<Schedule>> =
+        userScope.uid.flatMapLatest { uid ->
+            if (uid == null) return@flatMapLatest flowOf(emptyList())
+            callbackFlow {
+                val startMillis = startOfMonth(year, month)
+                val endMillis = startOfMonth(year, month + 1)
 
-        val listener = collection()
-            .whereGreaterThanOrEqualTo("dateMillis", startMillis)
-            .whereLessThan("dateMillis", endMillis)
-            .orderBy("dateMillis", Query.Direction.ASCENDING)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    close(error)
-                    return@addSnapshotListener
-                }
-                trySend(snapshot?.documents?.mapNotNull { it.toSchedule() } ?: emptyList())
+                val listener = collection(userScope.userDoc(uid))
+                    .whereGreaterThanOrEqualTo("dateMillis", startMillis)
+                    .whereLessThan("dateMillis", endMillis)
+                    .orderBy("dateMillis", Query.Direction.ASCENDING)
+                    .addSnapshotListener { snapshot, error ->
+                        if (error != null) {
+                            close(error)
+                            return@addSnapshotListener
+                        }
+                        trySend(snapshot?.documents?.mapNotNull { it.toSchedule() } ?: emptyList())
+                    }
+                awaitClose { listener.remove() }
             }
-        awaitClose { listener.remove() }
-    }
+        }
 
     override suspend fun get(id: String): Schedule? =
         collection().document(id).get().await().toSchedule()
@@ -64,10 +73,8 @@ class FirestoreScheduleRepository @Inject constructor(
         collection().document(id).delete().await()
     }
 
-    private fun collection() = firestore
-        .collection("users")
-        .document(USER_ID)
-        .collection("schedules")
+    private fun collection(userDoc: DocumentReference = userScope.requireUserDoc()): CollectionReference =
+        userDoc.collection("schedules")
 
     private fun DocumentSnapshot.toSchedule(): Schedule? {
         val title = getString("title") ?: return null
@@ -89,9 +96,4 @@ class FirestoreScheduleRepository @Inject constructor(
             clear()
             set(year, month - 1, 1)
         }.timeInMillis
-
-    private companion object {
-        // TODO: 실제로는 FirebaseAuth.currentUser?.uid (다른 리포지토리와 동일)
-        const val USER_ID = "demo"
-    }
 }

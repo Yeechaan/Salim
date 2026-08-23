@@ -26,6 +26,9 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.firestore)
+    implementation(libs.firebase.auth)
+    // 온보딩 완료 플래그 등 로컬 전용 데이터 (CLAUDE.md 2번 data/local)
+    implementation(libs.androidx.datastore.preferences)
 
     testImplementation(libs.junit)
 }
