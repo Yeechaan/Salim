@@ -14,3 +14,4 @@ PRD 각 섹션에 대응하는 화면 구조와 배치 순서를 화면별로 �
 | [schedule.md](schedule.md) | 5. 일정 | 캘린더 · 일정 등록 · 일정 수정 |
 | [dday.md](dday.md) | 6. 디데이 | 디데이 리스트 · 추가 · 수정 |
 | [settings.md](settings.md) | 7. 설정 | 프로필/카테고리/예산/알림/연결 |
+| [connect.md](connect.md) | 9. 상대방 연결 | 연결 관리 · 초대 코드 · 코드 입력 · 완료 |
