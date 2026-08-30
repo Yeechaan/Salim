@@ -25,4 +25,55 @@
     <string name="settings_sign_out_confirm_body">다시 로그인하면 기록은 그대로 남아 있어요.</string>
     <string name="common_cancel">취소</string>
     <string name="common_confirm">확인</string>
+    <!-- 상대방 연결 (docs/wireframe/connect.md 9-1~9-5) -->
+    <string name="connect_title">상대방 연결</string>
+    <string name="connect_intro_title">함께 기록할 상대방과 연결해보세요</string>
+    <string name="connect_intro_body">연결 전에 각자 쓴 기록은 그대로 본인만 볼 수 있어요</string>
+    <string name="connect_create_code">초대 코드 만들기</string>
+    <string name="connect_enter_code">받은 코드 입력하기</string>
+    <string name="connect_connected">%s님과 연결됨</string>
+    <string name="connect_connected_since">%s부터 함께 기록 중</string>
+    <string name="connect_disconnect">연결 해제</string>
+    <string name="connect_preparing">준비 중</string>
+
+    <!-- 9-2. 내 초대 코드 -->
+    <string name="invite_title">초대 코드</string>
+    <string name="invite_copied">복사했어요</string>
+    <string name="invite_remaining">%d분 남음</string>
+    <string name="invite_remaining_soon">곧 만료돼요</string>
+    <string name="invite_expired">코드가 만료됐어요</string>
+    <string name="invite_share">공유하기</string>
+    <string name="invite_regenerate">코드 새로 만들기</string>
+    <string name="invite_failed">코드를 만들지 못했어요</string>
+    <string name="invite_retry">다시 시도</string>
+    <string name="invite_share_subject">같이살림 초대</string>
+    <string name="invite_share_text">같이살림에서 함께 가계부를 써요.\n초대 코드: %1$s\n%2$s\n30분 안에 입력해주세요.</string>
+
+    <!-- 9-3. 코드 입력 -->
+    <string name="code_input_title">코드 입력</string>
+    <string name="code_input_body">상대방이 공유한 6자리 코드를 입력해주세요</string>
+    <string name="code_input_scan">QR로 스캔하기</string>
+    <string name="code_input_submit">연결하기</string>
+
+    <!-- 9-4. 확인 시트 -->
+    <string name="connect_confirm_title">%s님과 연결할까요?</string>
+    <string name="connect_confirm_body">지금까지 각자 쓴 기록은 그대로 본인만 볼 수 있어요. 연결한 뒤에 쓴 기록부터 함께 보여요.</string>
+
+    <!-- 9-5. 연결 완료 -->
+    <string name="connect_done_title">%s님과 연결됐어요</string>
+    <string name="connect_done_body">이제 가계부와 일정을 함께 봐요</string>
+    <string name="connect_done_home">홈으로</string>
+
+    <!-- 실패 문구 (connect.md 상태 분기 종합) -->
+    <string name="connect_error_not_found">코드를 다시 확인해주세요</string>
+    <string name="connect_error_expired">코드가 만료됐어요. 상대방에게 새 코드를 요청해주세요</string>
+    <string name="connect_error_own_code">내가 만든 코드예요</string>
+    <string name="connect_error_already_connected">이미 연결된 상태예요</string>
+    <string name="connect_error_partner_connected">상대방이 이미 다른 분과 연결돼 있어요</string>
+    <string name="connect_error_qr">QR을 다시 확인해주세요</string>
+    <string name="connect_error_network">연결에 실패했어요. 잠시 후 다시 시도해주세요</string>
+
+    <!-- 홈 연결 배너 (home.md 1-1) -->
+    <string name="home_connect_banner_title">상대방을 연결해보세요</string>
+    <string name="home_connect_banner_body">초대 코드나 QR로 함께 기록해요</string>
 </resources>

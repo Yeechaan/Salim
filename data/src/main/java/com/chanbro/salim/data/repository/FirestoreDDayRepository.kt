@@ -29,12 +29,12 @@ class FirestoreDDayRepository @Inject constructor(
 ) : DDayRepository {
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    override fun observeAll(): Flow<List<DDay>> = userScope.uid.flatMapLatest { uid ->
-        if (uid == null) return@flatMapLatest flowOf(emptyList())
+    override fun observeAll(): Flow<List<DDay>> = userScope.scope.flatMapLatest { scope ->
+        if (scope == null) return@flatMapLatest flowOf(emptyList())
         callbackFlow {
             // 정렬은 표시 시점에 남은 일수로 계산하므로 여기서는 orderBy를 걸지 않는다
             // (매년 반복 항목은 저장된 날짜와 다음 기념일이 다르기 때문).
-            val listener = collection(userScope.userDoc(uid))
+            val listener = collection(scope.doc)
                 .addSnapshotListener { snapshot, error ->
                     if (error != null) {
                         close(error)
@@ -47,7 +47,7 @@ class FirestoreDDayRepository @Inject constructor(
     }
 
     override suspend fun get(id: String): DDay? =
-        collection().document(id).get().await().toDDay()
+        collection(userScope.requireScope().doc).document(id).get().await().toDDay()
 
     override suspend fun save(dDay: DDay) {
         val data = mapOf(
@@ -57,15 +57,15 @@ class FirestoreDDayRepository @Inject constructor(
             "source" to dDay.source.name,
             "createdAtMillis" to dDay.createdAtMillis,
         )
-        collection().document(dDay.id).set(data).await()
+        collection(userScope.requireScope().doc).document(dDay.id).set(data).await()
     }
 
     override suspend fun delete(id: String) {
-        collection().document(id).delete().await()
+        collection(userScope.requireScope().doc).document(id).delete().await()
     }
 
-    private fun collection(userDoc: DocumentReference = userScope.requireUserDoc()): CollectionReference =
-        userDoc.collection("ddays")
+    private fun collection(scopeDoc: DocumentReference): CollectionReference =
+        scopeDoc.collection("ddays")
 
     private fun DocumentSnapshot.toDDay(): DDay? {
         val title = getString("title") ?: return null

@@ -70,6 +70,9 @@ dependencies {
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.googleid)
+    // 상대방 연결 QR (PRD 9) — 코드 스캐너는 카메라 권한 없이 GMS가 UI를 제공한다
+    implementation(libs.zxing.core)
+    implementation(libs.play.services.code.scanner)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

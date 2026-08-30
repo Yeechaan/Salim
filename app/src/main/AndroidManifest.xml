@@ -22,6 +22,17 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- 초대 QR / 공유 링크 (wireframe/connect.md 9-3 딥링크 진입).
+                 소유 도메인이 없어 App Links 대신 커스텀 스킴을 쓴다. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:scheme="salim" android:host="invite" />
+            </intent-filter>
         </activity>
     </application>
 

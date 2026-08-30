@@ -3,6 +3,7 @@ package com.chanbro.salim.di
 import android.content.Context
 import com.chanbro.salim.data.local.OnboardingPreferences
 import com.chanbro.salim.data.repository.FirebaseAuthRepository
+import com.chanbro.salim.data.repository.FirestoreConnectionRepository
 import com.chanbro.salim.data.repository.FirestoreBudgetRepository
 import com.chanbro.salim.data.repository.FirestoreDDayRepository
 import com.chanbro.salim.data.repository.FirestoreExpenseRepository
@@ -10,6 +11,7 @@ import com.chanbro.salim.data.repository.FirestoreProfileRepository
 import com.chanbro.salim.data.repository.FirestoreScheduleRepository
 import com.chanbro.salim.domain.repository.AuthRepository
 import com.chanbro.salim.domain.repository.BudgetRepository
+import com.chanbro.salim.domain.repository.ConnectionRepository
 import com.chanbro.salim.domain.repository.DDayRepository
 import com.chanbro.salim.domain.repository.ExpenseRepository
 import com.chanbro.salim.domain.repository.OnboardingRepository
@@ -52,6 +54,10 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindAuthRepository(impl: FirebaseAuthRepository): AuthRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindConnectionRepository(impl: FirestoreConnectionRepository): ConnectionRepository
 
     companion object {
         @Provides

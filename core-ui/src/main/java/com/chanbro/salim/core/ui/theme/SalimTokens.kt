@@ -20,6 +20,9 @@ object SalimTokens {
     val Accent = Color(0xFFE8896B)       // 선택 탭, 링크(전체보기), D-day 배지, 강조 수치
     val AccentSoft = Color(0xFFFCE4D8)   // Coral 옅은 버전: 아이콘 칩/프로필 배경
 
+    // 경고 (design.md: 예산 100% 초과, 입력 오류 — 테라코타 계열)
+    val Warning = Color(0xFFC1614A)
+
     // 진행률 / 구분선
     val ProgressTrack = Color(0xFFF1E7DB)
     val ProgressFillStart = Color(0xFFF3A98E) // Peach (그라데이션 시작)

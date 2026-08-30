@@ -43,7 +43,7 @@
 **왜 `members`를 맵으로 두는가**
 - `users/{uid}`는 본인만 읽을 수 있어 상대의 이름·사진을 가져올 수 없다. 규칙을 푸는 대신 표시용 최소 정보만 커플 문서에 복제한다.
 - 서브컬렉션이 아닌 이유: 커플 문서를 만드는 **같은 배치** 안에서 서브컬렉션 쓰기 규칙이 아직 존재하지 않는 부모 문서를 참조해야 해서 검증이 꼬인다. 맵은 커플 문서 생성 규칙 하나로 함께 검증된다.
-- 각자 앱을 열 때 자기 항목(`members[내 uid]`)을 최신 소셜 프로필로 갱신한다.
+- 채우는 시점은 성사 배치 한 번뿐이다. 상대 항목의 `photoUrl`은 초대 문서에 사진을 담지 않기로 해서 비어 있고, 표시 이름도 그 뒤 상대가 구글 프로필을 바꾸면 낡는다. **아직 갱신 경로가 없다** — 지금은 사진을 쓰는 화면이 없어(공용 아이콘으로 그린다) 드러나지 않지만, 프로필 사진을 실제로 띄우게 되면 각자 앱을 열 때 자기 항목을 다시 쓰는 처리가 필요하다.
 - 감수하는 부작용: 두 사람이 서로의 표시 이름을 덮어쓸 수 있다. 연결된 당사자 사이라 수용한다.
 
 ### {expenses}/{expenseId}
@@ -188,6 +188,7 @@
 |---|---|---|
 | coupleId | String? | 연결된 couples 문서 id, 미연결 시 null. **경로 판정의 SSOT가 아니다** — 아래 참고 |
 | birthdayMillis / anniversaryMillis | Number? | 생일/기념일 (UTC 자정 millis). ddays의 AUTO 항목이 파생되는 source — ddays 컬렉션에 쓰지 않는다 |
+| inviteCode | String? | 지금 발급해 둔 내 초대 코드. `invites`는 `list`를 막아 뒀기 때문에 "내 코드 찾기"를 쿼리로 할 수 없어, 코드를 내 문서에 적어 둔다 |
 | fcmToken | String? | 푸시 발송용 |
 | notificationSettings | Map | 알림 종류별 on/off (PRD 8. 알림 표 기준) |
 
@@ -210,10 +211,14 @@ Cloud Functions 없이 **클라이언트 쓰기 + 보안 규칙**만으로 두 �
 | createdAt | Timestamp | 발급 시각 |
 | expiresAt | Timestamp | `createdAt + 30분` |
 
-- **코드 규격**: Crockford Base32 6자리 — `0-9`와 `A-Z`에서 혼동 문자 `I`, `O`, `U`를 뺀 32글자. 약 10.7억(32⁶) 조합. 입력은 대문자로 정규화한다.
+- **코드 규격**: Crockford Base32 6자리 — `0-9`와 `A-Z`에서 혼동 문자 `I`, `L`, `O`, `U`를 뺀 32글자. 약 10.7억(32⁶) 조합.
+  - 입력은 대문자로 올린 뒤 Crockford 관례대로 헷갈리는 글자를 숫자로 접는다(`I`·`L` → `1`, `O` → `0`). 손으로 옮겨 적다 나는 오타를 실패로 만들지 않기 위한 것.
+  - 규격은 `domain/model/InviteCode.kt`에 있다 — 발급(:data)과 입력 정규화(UI)가 같은 값을 봐야 한다.
 - **발급**: 사용자당 유효 코드 1개. 무작위 코드로 `create`를 시도하고(이미 있으면 실패) 충돌 시 최대 5회 재생성한다. 새로 만들면 이전 코드는 삭제한다.
 - **소진**: 성사 배치에서 삭제한다. 삭제가 유실돼도 규칙의 "발급자가 이미 연결됨" 검사에 걸려 재사용되지 않는다.
 - **사진 URL은 담지 않는다** — 코드를 맞힌 사람에게 노출되는 정보를 표시 이름 하나로 줄인다.
+
+> **유효기간은 클라이언트 시계로 찍는다**: `expiresAt`을 서버 타임스탬프로 계산하려면 서버 코드가 필요하다. 대신 규칙이 발급·사용 두 시점 모두에서 `expiresAt > request.time`(서버 시각)을 확인하므로, **서버 시각 기준으로 만료된 코드는 절대 사용되지 않는다**. 기기 시계를 앞당기면 자기 코드의 수명을 늘릴 수 있지만 남의 코드에는 영향이 없어 그대로 둔다.
 
 > **감수하는 트레이드오프**: 서버가 없어 코드 무작위 대입에 요청 빈도 제한을 걸 수 없다. 완화책은 ① 10.7억 조합 ② 30분 유효 ③ 1회용 ④ `list` 금지(단건 `get`만) ⑤ 성공해도 얻는 것은 발급자 표시 이름뿐이고 가계부·일정 데이터에는 접근할 수 없음. 요청 빈도 제한이 필요해지면 Cloud Functions callable로 이 컬렉션을 감싸면 되고, 나머지 데이터 모델은 그대로 쓴다.
 
@@ -235,86 +240,16 @@ Cloud Functions 없이 **클라이언트 쓰기 + 보안 규칙**만으로 두 �
 
 ## 보안 규칙
 
-아래는 **설계 초안**이다. 실제 `firestore.rules` 반영과 에뮬레이터 검증은 구현 단계에서 한다.
+실물은 **[`firestore.rules`](../firestore.rules)** 다. 설계 의도만 여기 적고 규칙 본문은 옮겨 적지 않는다 — 두 벌을 두면 반드시 어긋난다.
 
-```
-function signedIn() { return request.auth != null; }
-function isOwner(userId) { return signedIn() && request.auth.uid == userId; }
+| 경로 | 규칙 요지 |
+|---|---|
+| `invites/{code}` | `get`만 허용하고 `list`는 막는다(코드 전수 조회 차단). `create`는 본인이 발급자일 때만, `update`는 아예 막아 코드 충돌이 거절로 드러나게 한다 |
+| `users/{userId}` | 본인만 read/write. **예외 하나** — 연결 성사 순간에 상대가 내 `coupleId` 한 필드를 채우는 것 |
+| `couples/{coupleId}` | `memberIds`에 있는 uid만 접근. `create`는 초대 코드 검증을 통과할 때만, `delete`는 막는다(해제는 `deletedAt` 마킹) |
+| `couples/{coupleId}/**` | 멤버만 read. write는 `deletedAt`이 없을 때만(유예기간 중 열람만) |
 
-function userDoc(uid)     { return /databases/$(database)/documents/users/$(uid); }
-function inviteDoc(code)  { return /databases/$(database)/documents/invites/$(code); }
-function coupleDoc(id)    { return /databases/$(database)/documents/couples/$(id); }
-
-// 두 uid로부터 커플 문서 id를 결정적으로 만든다
-function coupleIdOf(a, b) { return a < b ? a + '_' + b : b + '_' + a; }
-
-function unpaired(uid) { return get(userDoc(uid)).data.coupleId == null; }
-
-// 초대 코드가 유효하고, 발급자가 상대이며, 양쪽 모두 미연결인가
-function pairingAllowed(code, inviterUid) {
-  return exists(inviteDoc(code))
-    && get(inviteDoc(code)).data.inviterUid == inviterUid
-    && get(inviteDoc(code)).data.expiresAt > request.time
-    && unpaired(inviterUid)
-    && unpaired(request.auth.uid);
-}
-
-match /invites/{code} {
-  allow get:    if signedIn();   // 코드 자체가 비밀 — 단건 조회만
-  allow list:   if false;        // 전수 조회 금지
-  allow create: if signedIn()
-                && request.resource.data.inviterUid == request.auth.uid
-                && request.resource.data.expiresAt > request.time;
-  allow update: if false;        // 수정 개념 없음 — 새로 만들거나 지운다
-  allow delete: if signedIn();   // 발급자의 회수 + 수락자의 소진
-}
-
-match /users/{userId} {
-  allow read, write: if isOwner(userId);
-
-  // 연결 성사 순간에만, 상대가 내 coupleId 한 필드를 채우는 것을 허용한다.
-  allow update: if signedIn()
-    && resource.data.coupleId == null
-    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['coupleId'])
-    && request.resource.data.coupleId != null
-    && userId in getAfter(coupleDoc(request.resource.data.coupleId)).data.memberIds
-    && request.auth.uid in getAfter(coupleDoc(request.resource.data.coupleId)).data.memberIds;
-
-  match /{document=**} {
-    allow read, write: if isOwner(userId);
-  }
-}
-
-match /couples/{coupleId} {
-  function couple()      { return get(coupleDoc(coupleId)).data; }
-  function isMember()    { return signedIn() && request.auth.uid in couple().memberIds; }
-  function notDeleted()  { return couple().deletedAt == null; }
-  function partnerOf(ids){ return ids[0] == request.auth.uid ? ids[1] : ids[0]; }
-
-  allow get, list: if signedIn() && request.auth.uid in resource.data.memberIds;
-
-  allow create: if signedIn()
-    && request.resource.data.memberIds.size() == 2
-    && request.auth.uid in request.resource.data.memberIds
-    // 자기 코드로 자기 자신과 연결하는 것을 막는다 (memberIds: [B, B])
-    && partnerOf(request.resource.data.memberIds) != request.auth.uid
-    && coupleId == coupleIdOf(request.resource.data.memberIds[0],
-                              request.resource.data.memberIds[1])
-    && request.resource.data.deletedAt == null
-    && pairingAllowed(request.resource.data.inviteCode,
-                      partnerOf(request.resource.data.memberIds));
-
-  allow update: if isMember() && notDeleted();
-  allow delete: if false;   // 해제는 삭제가 아니라 deletedAt 마킹 (PRD 9)
-
-  match /{document=**} {
-    allow read:  if isMember();
-    allow write: if isMember() && notDeleted();
-  }
-}
-```
-
-**`users`의 두 번째 `allow update`가 이 설계에서 새로 여는 유일한 구멍이다.** 세 겹으로 좁혀 둔다 — ① `coupleId`가 비어 있을 때만 ② 그 필드 하나만 ③ 두 사람이 실제로 멤버인 커플 문서를 가리킬 때만. 개인 데이터 하위 컬렉션은 `match /{document=**}`가 본인 전용으로 계속 잠근다.
+**`users`의 두 번째 `allow update`가 이 설계에서 새로 여는 유일한 구멍이다.** 세 겹으로 좁혀 둔다 — ① `coupleId`가 비어 있을 때만 ② 그 필드 하나만 ③ `getAfter()`로 본 커플 문서에 두 사람이 모두 멤버일 때만. 개인 데이터 하위 컬렉션은 `match /{document=**}`가 본인 전용으로 계속 잠근다.
 
 **클라이언트가 미리 못 잡는 실패**: 상대의 `users` 문서는 읽을 수 없으므로 "상대가 이미 다른 사람과 연결됨"은 규칙 거절(`PERMISSION_DENIED`)로만 알 수 있다. 화면 문구 매핑은 wireframe/connect.md "상태 분기 종합" 참고.
 

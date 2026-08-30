@@ -18,6 +18,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.Icon
@@ -37,13 +39,16 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.chanbro.salim.R
 import com.chanbro.salim.core.ui.theme.SalimTheme
 import com.chanbro.salim.core.ui.theme.SalimTokens
+import com.chanbro.salim.domain.model.Connection
 import com.chanbro.salim.ui.common.DDayBadge
 import com.chanbro.salim.ui.common.MonthPickerSheet
 import com.chanbro.salim.ui.common.MonthSelector
@@ -52,6 +57,7 @@ import com.chanbro.salim.ui.common.SalimCard
 import com.chanbro.salim.ui.common.SalimTab
 import com.chanbro.salim.ui.common.SalimType
 import com.chanbro.salim.ui.common.categoryVisual
+import com.chanbro.salim.ui.connect.ConnectViewModel
 import com.chanbro.salim.ui.dday.DDayListViewModel
 
 // ---------------------------------------------------------------------------
@@ -61,6 +67,7 @@ import com.chanbro.salim.ui.dday.DDayListViewModel
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
+    onConnectClick: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -80,6 +87,7 @@ fun HomeScreen(
                 label = "${state.year}년 ${state.month}월",
                 onClick = { showMonthPicker = true },
             )
+            ConnectBanner(onClick = onConnectClick)
             BudgetCard(state = state, onClick = { showBudgetSheet = true })
             CategoryCard(state.categories)
             UpcomingDDayCard()
@@ -109,6 +117,67 @@ fun HomeScreen(
                 showBudgetSheet = false
             },
         )
+    }
+}
+
+/**
+ * 미연결 상태에서만 뜨는 연결 배너. (home.md 1-1 / PRD 1 "홈·설정에 상시 노출")
+ *
+ * 예산 카드보다 시각적 무게를 낮춘다 — 홈의 주인공은 예산 현황이고 배너는 권유다.
+ * 연결되면 완료 표시를 남기지 않고 그냥 사라진다.
+ */
+@Composable
+private fun ConnectBanner(onClick: () -> Unit, viewModel: ConnectViewModel = hiltViewModel()) {
+    val connection by viewModel.connection.collectAsStateWithLifecycle()
+    // 판정 전(Unknown)에도 그리지 않는다 — 이미 연결된 사용자에게 한 번 깜빡이는 것을 막는다.
+    if (connection !is Connection.None) return
+
+    SalimCard(
+        modifier = Modifier.clickable(onClick = onClick),
+        cornerRadius = 20.dp,
+        contentPadding = 16.dp,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(SalimTokens.AccentSoft),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Filled.People,
+                    contentDescription = null,
+                    tint = SalimTokens.Accent,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    stringResource(R.string.home_connect_banner_title),
+                    style = SalimType.bodyLg,
+                    color = SalimTokens.TextPrimary,
+                )
+                Text(
+                    stringResource(R.string.home_connect_banner_body),
+                    style = SalimType.bodySm,
+                    color = SalimTokens.TextMuted,
+                )
+            }
+            Icon(
+                Icons.Filled.ChevronRight,
+                contentDescription = null,
+                tint = SalimTokens.TextMuted,
+                modifier = Modifier.size(20.dp),
+            )
+        }
     }
 }
 

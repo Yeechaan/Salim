@@ -37,10 +37,15 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.navigation.navDeepLink
 import com.chanbro.salim.core.ui.theme.SalimTheme
 import com.chanbro.salim.core.ui.theme.SalimTokens
 import com.chanbro.salim.ui.common.SalimBottomBar
 import com.chanbro.salim.ui.common.SalimTab
+import com.chanbro.salim.ui.connect.CodeInputScreen
+import com.chanbro.salim.ui.connect.ConnectDoneScreen
+import com.chanbro.salim.ui.connect.ConnectScreen
+import com.chanbro.salim.ui.connect.InviteCodeScreen
 import com.chanbro.salim.ui.dday.DDayInputScreen
 import com.chanbro.salim.ui.dday.DDayScreen
 import com.chanbro.salim.ui.expense.ExpenseInputScreen
@@ -62,6 +67,15 @@ private const val ROUTE_DDAY_EDIT = "dday_edit/{ddayId}"
 private const val ROUTE_SCHEDULE_INPUT = "schedule_input/{dateMillis}"
 private const val ROUTE_SCHEDULE_EDIT = "schedule_edit/{scheduleId}"
 private const val ROUTE_PROFILE_EDIT = "profile_edit"
+
+// 상대방 연결 (wireframe/connect.md 9-1~9-5)
+private const val ROUTE_CONNECT = "connect"
+private const val ROUTE_CONNECT_INVITE = "connect_invite"
+private const val ROUTE_CONNECT_CODE = "connect_code?code={code}"
+private const val ROUTE_CONNECT_DONE = "connect_done"
+
+private fun connectCodeRoute(code: String? = null): String =
+    if (code == null) "connect_code" else "connect_code?code=${Uri.encode(code)}"
 
 private fun scheduleInputRoute(dateMillis: Long): String = "schedule_input/$dateMillis"
 private fun scheduleEditRoute(scheduleId: String): String =
@@ -189,7 +203,9 @@ private fun SalimNavGraph(
         ) {
             composable(ROUTE_ONBOARDING) { OnboardingScreen(onFinish = onOnboardingFinished) }
             composable(ROUTE_LOGIN) { LoginScreen() }
-            composable(SalimTab.Home.route) { HomeScreen() }
+            composable(SalimTab.Home.route) {
+                HomeScreen(onConnectClick = { navController.navigate(ROUTE_CONNECT) })
+            }
             composable(SalimTab.Expense.route) {
                 ExpenseScreen(onItemClick = { navController.navigate(ROUTE_EXPENSE_INPUT) })
             }
@@ -211,6 +227,57 @@ private fun SalimNavGraph(
             composable(SalimTab.Settings.route) {
                 SettingsScreen(
                     onProfileClick = { navController.navigate(ROUTE_PROFILE_EDIT) },
+                    onConnectClick = { navController.navigate(ROUTE_CONNECT) },
+                )
+            }
+            composable(ROUTE_CONNECT) {
+                ConnectScreen(
+                    onClose = { navController.popBackStack() },
+                    onCreateCode = { navController.navigate(ROUTE_CONNECT_INVITE) },
+                    onEnterCode = { navController.navigate(connectCodeRoute()) },
+                )
+            }
+            composable(ROUTE_CONNECT_INVITE) {
+                InviteCodeScreen(
+                    onClose = { navController.popBackStack() },
+                    onConnected = { navController.navigateToConnectDone() },
+                )
+            }
+            composable(
+                ROUTE_CONNECT_CODE,
+                arguments = listOf(
+                    navArgument("code") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                ),
+                // 초대 QR / 공유 링크로 바로 들어오는 경로 (connect.md 9-3)
+                deepLinks = listOf(navDeepLink { uriPattern = "salim://invite/{code}" }),
+            ) { entry ->
+                // 딥링크는 로그인 전에도 들어올 수 있다. 그때는 진입 상태가 정한 화면으로
+                // 돌려보내고, 코드는 로그인 후 다시 입력하게 한다.
+                if (appState != AppUiState.Main) {
+                    LaunchedEffect(Unit) {
+                        navController.navigate(appState.route()) {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    }
+                } else {
+                    CodeInputScreen(
+                        onClose = { navController.popBackStack() },
+                        onConnected = { navController.navigateToConnectDone() },
+                        prefillCode = entry.arguments?.getString("code"),
+                    )
+                }
+            }
+            composable(ROUTE_CONNECT_DONE) {
+                ConnectDoneScreen(
+                    onHome = {
+                        navController.navigate(SalimTab.Home.route) {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    },
                 )
             }
             composable(ROUTE_PROFILE_EDIT) {
@@ -275,6 +342,17 @@ private fun androidx.navigation.NavHostController.navigateToTab(tab: SalimTab) {
         popUpTo(SalimTab.Home.route) { saveState = true }
         launchSingleTop = true
         restoreState = true
+    }
+}
+
+/**
+ * 연결 완료로 이동. 연결 흐름 화면들(9-1~9-3)은 뒤로가기에 남기지 않는다 —
+ * 이미 연결된 상태에서 "초대 코드" 화면으로 되돌아가면 앞뒤가 맞지 않는다.
+ */
+private fun androidx.navigation.NavHostController.navigateToConnectDone() {
+    navigate(ROUTE_CONNECT_DONE) {
+        popUpTo(ROUTE_CONNECT) { inclusive = true }
+        launchSingleTop = true
     }
 }
 

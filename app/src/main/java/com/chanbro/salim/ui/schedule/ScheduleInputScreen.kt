@@ -42,7 +42,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.chanbro.salim.core.ui.theme.SalimTheme
 import com.chanbro.salim.core.ui.theme.SalimTokens
+import com.chanbro.salim.domain.model.Connection
 import com.chanbro.salim.domain.model.ScheduleType
+import com.chanbro.salim.ui.connect.ConnectViewModel
 import com.chanbro.salim.ui.common.DatePickerModal
 import com.chanbro.salim.ui.common.FieldDivider
 import com.chanbro.salim.ui.common.FieldRow
@@ -68,10 +70,13 @@ fun ScheduleInputScreen(
     scheduleId: String? = null,
     defaultDateMillis: Long = todayUtc(),
     viewModel: ScheduleInputViewModel = hiltViewModel(),
+    connectViewModel: ConnectViewModel = hiltViewModel(),
 ) {
     LaunchedEffect(scheduleId) { viewModel.load(scheduleId) }
     val initial by viewModel.initial.collectAsStateWithLifecycle()
     val loading by viewModel.loading.collectAsStateWithLifecycle()
+    // 미연결이면 모든 일정이 내 개인 일정이라 나눌 것이 없다. (schedule.md 5-2)
+    val connection by connectViewModel.connection.collectAsStateWithLifecycle()
 
     // 프리필을 받기 전에는 그리지 않는다 (빈 입력값이 잠깐 보이는 것 방지).
     if (loading) return
@@ -80,6 +85,7 @@ fun ScheduleInputScreen(
     ScheduleInputContent(
         isEdit = scheduleId != null,
         initial = initial,
+        connected = connection is Connection.Connected,
         defaultDateMillis = defaultDateMillis,
         onClose = onClose,
         onSave = { title, dateMillis, minuteOfDay, type ->
@@ -94,6 +100,7 @@ fun ScheduleInputScreen(
 private fun ScheduleInputContent(
     isEdit: Boolean,
     initial: ScheduleInitial?,
+    connected: Boolean,
     defaultDateMillis: Long,
     onClose: () -> Unit,
     onSave: (title: String, dateMillis: Long, minuteOfDay: Int?, type: ScheduleType) -> Unit,
@@ -150,8 +157,10 @@ private fun ScheduleInputContent(
                         onClick = { showTimePicker = true },
                     )
                 }
-                FieldDivider()
-                TypeField(selected = type, onSelect = { type = it })
+                if (connected) {
+                    FieldDivider()
+                    TypeField(selected = type, onSelect = { type = it })
+                }
             }
         }
 
@@ -314,6 +323,7 @@ private fun ScheduleInputAddPreview() {
         ScheduleInputContent(
             isEdit = false,
             initial = null,
+            connected = true,
             defaultDateMillis = todayUtc(),
             onClose = {},
             onSave = { _, _, _, _ -> },
@@ -328,6 +338,7 @@ private fun ScheduleInputEditPreview() {
     SalimTheme {
         ScheduleInputContent(
             isEdit = true,
+            connected = true,
             initial = ScheduleInitial("저녁 약속", todayUtc(), 19 * 60, ScheduleType.SHARED),
             defaultDateMillis = todayUtc(),
             onClose = {},
