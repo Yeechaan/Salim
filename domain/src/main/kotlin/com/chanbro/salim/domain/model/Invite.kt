@@ -13,14 +13,17 @@ data class Invite(
     fun isExpired(nowMillis: Long): Boolean = expiresAtMillis <= nowMillis
 }
 
-/** 코드 조회 결과. 실패 사유가 그대로 화면 문구가 된다 (wireframe/connect.md 상태 분기 종합). */
+/**
+ * 코드 조회 결과. 실패 사유가 그대로 화면 문구가 된다 (wireframe/connect.md 상태 분기 종합).
+ *
+ * "내가 이미 연결됨"은 여기 없다 — 코드와 무관하게 내 연결 상태만 보면 되는 판정이라
+ * 조회를 부르기 전에 ViewModel이 끊는다.
+ */
 sealed interface InviteLookup {
     data class Found(val invite: Invite) : InviteLookup
     data object NotFound : InviteLookup
     data object Expired : InviteLookup
     data object OwnCode : InviteLookup
-    /** 내가 이미 다른 사람과 연결돼 있다. */
-    data object AlreadyConnected : InviteLookup
     data object Failed : InviteLookup
 }
 

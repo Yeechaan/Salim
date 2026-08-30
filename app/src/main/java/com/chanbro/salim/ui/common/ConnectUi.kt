@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -37,6 +38,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.createBitmap
+import com.chanbro.salim.R
 import com.chanbro.salim.core.ui.theme.SalimTheme
 import com.chanbro.salim.core.ui.theme.SalimTokens
 import com.google.zxing.BarcodeFormat
@@ -153,7 +155,11 @@ fun QrCard(content: String, code: String, modifier: Modifier = Modifier) {
                         .background(SalimTokens.ProgressTrack),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text("QR을 만들지 못했어요", style = SalimType.bodySm, color = SalimTokens.TextMuted)
+                    Text(
+                        stringResource(R.string.invite_qr_failed),
+                        style = SalimType.bodySm,
+                        color = SalimTokens.TextMuted,
+                    )
                 }
             }
             Text(

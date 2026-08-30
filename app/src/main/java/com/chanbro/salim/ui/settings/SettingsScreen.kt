@@ -216,7 +216,11 @@ private fun SettingsTopBar() {
                 .padding(horizontal = 20.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("설정", style = SalimType.headlineSm, color = SalimTokens.TextPrimary)
+            Text(
+                stringResource(R.string.settings_title),
+                style = SalimType.headlineSm,
+                color = SalimTokens.TextPrimary,
+            )
         }
     }
 }

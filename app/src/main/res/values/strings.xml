@@ -43,6 +43,7 @@
     <string name="invite_remaining_seconds">%d초 남음</string>
     <string name="invite_expired">코드가 만료됐어요</string>
     <string name="invite_share">공유하기</string>
+    <string name="invite_qr_failed">QR을 만들지 못했어요</string>
     <string name="invite_regenerate">코드 새로 만들기</string>
     <string name="invite_failed">코드를 만들지 못했어요</string>
     <string name="invite_retry">다시 시도</string>

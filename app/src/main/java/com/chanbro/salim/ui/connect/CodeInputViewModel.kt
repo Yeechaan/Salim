@@ -103,8 +103,6 @@ class CodeInputViewModel @Inject constructor(
                 InviteLookup.NotFound -> _uiState.value.copy(checking = false, error = ConnectError.NOT_FOUND)
                 InviteLookup.Expired -> _uiState.value.copy(checking = false, error = ConnectError.EXPIRED)
                 InviteLookup.OwnCode -> _uiState.value.copy(checking = false, error = ConnectError.OWN_CODE)
-                InviteLookup.AlreadyConnected ->
-                    _uiState.value.copy(checking = false, error = ConnectError.ALREADY_CONNECTED)
                 InviteLookup.Failed -> _uiState.value.copy(checking = false, error = ConnectError.NETWORK)
             }
             _uiState.value = state
