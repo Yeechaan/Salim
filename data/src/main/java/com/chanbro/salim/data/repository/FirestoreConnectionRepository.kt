@@ -1,5 +1,6 @@
 package com.chanbro.salim.data.repository
 
+import android.util.Log
 import com.chanbro.salim.domain.model.ConnectResult
 import com.chanbro.salim.domain.model.Connection
 import com.chanbro.salim.domain.model.Invite
@@ -74,6 +75,7 @@ class FirestoreConnectionRepository @Inject constructor(
         val snapshot = try {
             inviteDoc(normalized).get().await()
         } catch (e: FirebaseFirestoreException) {
+            Log.w(TAG, "초대 코드 조회 실패", e)
             return InviteLookup.Failed
         }
         val invite = snapshot.toInvite() ?: return InviteLookup.NotFound
@@ -122,6 +124,7 @@ class FirestoreConnectionRepository @Inject constructor(
             batch.commit().await()
             ConnectResult.Success
         } catch (e: FirebaseFirestoreException) {
+            Log.w(TAG, "연결 성사 배치 거절 (code=${e.code})", e)
             if (e.code != FirebaseFirestoreException.Code.PERMISSION_DENIED) {
                 return ConnectResult.Failed
             }
@@ -133,6 +136,7 @@ class FirestoreConnectionRepository @Inject constructor(
             // (wireframe/connect.md 상태 분기 종합).
             ConnectResult.PartnerAlreadyConnected
         } catch (e: Exception) {
+            Log.w(TAG, "연결 성사 실패", e)
             ConnectResult.Failed
         }
     }
@@ -165,6 +169,9 @@ class FirestoreConnectionRepository @Inject constructor(
                 inviteDoc(code).set(data).await()
                 return Invite(code, uid, displayName, expiresAt)
             } catch (e: Exception) {
+                // 코드 충돌과 규칙 거절이 똑같이 PERMISSION_DENIED로 온다(update를 막아 뒀기 때문).
+                // 화면 문구로는 구분되지 않으니 여기서 남긴다.
+                Log.w(TAG, "초대 코드 발급 실패 (${it + 1}/$CODE_ATTEMPTS)", e)
                 lastError = e
             }
         }
@@ -207,6 +214,7 @@ class FirestoreConnectionRepository @Inject constructor(
     }
 
     private companion object {
+        const val TAG = "SalimConnect"
         const val COLLECTION_INVITES = "invites"
         const val COLLECTION_COUPLES = "couples"
         const val FIELD_INVITE_CODE = "inviteCode"
