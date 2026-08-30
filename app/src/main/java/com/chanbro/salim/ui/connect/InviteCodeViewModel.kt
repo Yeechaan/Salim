@@ -20,8 +20,8 @@ import kotlin.math.ceil
 data class InviteCodeUiState(
     val loading: Boolean = true,
     val code: String? = null,
-    /** 남은 시간(분). 0이면 1분 미만. */
-    val remainingMinutes: Int = 0,
+    /** 남은 시간(초). */
+    val remainingSeconds: Int = 0,
     val expired: Boolean = false,
     val failed: Boolean = false,
 )
@@ -62,7 +62,7 @@ class InviteCodeViewModel @Inject constructor(
                     _uiState.value = InviteCodeUiState(
                         loading = false,
                         code = invite.code,
-                        remainingMinutes = remainingMinutes(),
+                        remainingSeconds = remainingSeconds(),
                         expired = false,
                     )
                 }
@@ -72,28 +72,25 @@ class InviteCodeViewModel @Inject constructor(
         }
     }
 
-    /**
-     * 1초마다 재보되, 표시값이 바뀔 때만 상태를 갱신한다 — 30분짜리를 초 단위로
-     * 깜빡이게 하면 재촉하는 인상만 남는다. (wireframe/connect.md 9-2)
-     */
+    /** 1초마다 재서 남은 시간을 초 단위로 갱신한다. (wireframe/connect.md 9-2) */
     private fun startTicker() {
         viewModelScope.launch {
             while (true) {
                 delay(1_000)
                 val state = _uiState.value
                 if (state.code == null) continue
-                val minutes = remainingMinutes()
-                val expired = expiresAtMillis <= System.currentTimeMillis()
-                if (minutes != state.remainingMinutes || expired != state.expired) {
-                    _uiState.value = state.copy(remainingMinutes = minutes, expired = expired)
+                val seconds = remainingSeconds()
+                val expired = seconds <= 0
+                if (seconds != state.remainingSeconds || expired != state.expired) {
+                    _uiState.value = state.copy(remainingSeconds = seconds, expired = expired)
                 }
             }
         }
     }
 
-    /** 올림으로 센다 — "1분 남음"이 떴는데 이미 죽어 있는 것보다 낫다. */
-    private fun remainingMinutes(): Int {
+    /** 올림으로 센다 — "1초 남음"이 떴는데 이미 죽어 있는 것보다 낫다. */
+    private fun remainingSeconds(): Int {
         val remain = expiresAtMillis - System.currentTimeMillis()
-        return if (remain <= 0) 0 else ceil(remain / 60_000.0).toInt()
+        return if (remain <= 0) 0 else ceil(remain / 1_000.0).toInt()
     }
 }

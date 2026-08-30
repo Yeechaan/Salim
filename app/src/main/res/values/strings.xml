@@ -39,8 +39,8 @@
     <!-- 9-2. 내 초대 코드 -->
     <string name="invite_title">초대 코드</string>
     <string name="invite_copied">복사했어요</string>
-    <string name="invite_remaining">%d분 남음</string>
-    <string name="invite_remaining_soon">곧 만료돼요</string>
+    <string name="invite_remaining">%1$d분 %2$d초 남음</string>
+    <string name="invite_remaining_seconds">%d초 남음</string>
     <string name="invite_expired">코드가 만료됐어요</string>
     <string name="invite_share">공유하기</string>
     <string name="invite_regenerate">코드 새로 만들기</string>

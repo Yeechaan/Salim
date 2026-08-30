@@ -157,8 +157,8 @@ fun QrCard(content: String, code: String, modifier: Modifier = Modifier) {
                 }
             }
             Text(
-                text = code.chunked(3).joinToString(" "),
-                style = SalimType.bodyLg.copy(fontWeight = FontWeight.Bold, letterSpacing = 2.sp),
+                text = code,
+                style = SalimType.bodyLg.copy(fontWeight = FontWeight.Bold, letterSpacing = 3.sp),
                 color = SalimTokens.TextMuted,
             )
         }

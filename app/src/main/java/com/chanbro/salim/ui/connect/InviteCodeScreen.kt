@@ -115,7 +115,7 @@ private fun InviteCodeContent(
                 state.expired -> ExpiredBlock(onRegenerate = onRegenerate)
                 state.code != null -> ActiveCodeBlock(
                     code = state.code,
-                    remainingMinutes = state.remainingMinutes,
+                    remainingSeconds = state.remainingSeconds,
                     onCopy = onCopy,
                     onShare = onShare,
                     onRegenerate = onRegenerate,
@@ -187,15 +187,17 @@ private fun ExpiredBlock(onRegenerate: () -> Unit) {
 @Composable
 private fun ActiveCodeBlock(
     code: String,
-    remainingMinutes: Int,
+    remainingSeconds: Int,
     onCopy: (String) -> Unit,
     onShare: (String) -> Unit,
     onRegenerate: () -> Unit,
 ) {
     // 탭하면 복사된다는 것을 알 수 있도록 코드 자체를 넉넉한 탭 영역으로 둔다.
     Text(
-        text = code.toSpacedCode(),
-        style = SalimType.headlineMd.copy(letterSpacing = 6.sp),
+        // 끊어 쓰지 않는다 — 옮겨 적는 코드라 공백이 보이면 코드의 일부로 읽힌다.
+        // 읽기 편하게 하는 건 자간이 맡는다.
+        text = code,
+        style = SalimType.headlineMd.copy(letterSpacing = 8.sp),
         color = SalimTokens.TextPrimary,
         modifier = Modifier
             .clip(RoundedCornerShape(16.dp))
@@ -204,10 +206,11 @@ private fun ActiveCodeBlock(
     )
     Spacer(Modifier.height(4.dp))
     Text(
-        text = if (remainingMinutes <= 0) {
-            stringResource(R.string.invite_remaining_soon)
+        // 1분 미만이면 분을 떼고 초만 — "0분 12초"보다 "12초"가 읽기 쉽다.
+        text = if (remainingSeconds < 60) {
+            stringResource(R.string.invite_remaining_seconds, remainingSeconds)
         } else {
-            stringResource(R.string.invite_remaining, remainingMinutes)
+            stringResource(R.string.invite_remaining, remainingSeconds / 60, remainingSeconds % 60)
         },
         style = SalimType.bodySm,
         color = SalimTokens.TextMuted,
@@ -229,15 +232,12 @@ private fun ActiveCodeBlock(
     }
 }
 
-/** 6자리를 3자리씩 끊어 읽기 쉽게. */
-private fun String.toSpacedCode(): String = chunked(3).joinToString("  ")
-
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
 private fun InviteCodeScreenPreview() {
     SalimTheme {
         InviteCodeContent(
-            state = InviteCodeUiState(loading = false, code = "7K2M9Q", remainingMinutes = 28),
+            state = InviteCodeUiState(loading = false, code = "7K2M9Q", remainingSeconds = 1_712),
             modifier = Modifier.background(SalimTokens.Background),
             onClose = {},
             onCopy = {},
