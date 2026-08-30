@@ -8,46 +8,82 @@
 
 | 상태 | 경로(SSOT) |
 |---|---|
-| 미연결 | `users/{userId}/expenses`, `users/{userId}/categories`, `users/{userId}/budget` |
-| 연결 | `couples/{coupleId}/expenses`, `couples/{coupleId}/categories`, `couples/{coupleId}/budget` |
+| 미연결 | `users/{userId}/{expenses,schedules,ddays,categories,budget}` |
+| 연결 | `couples/{coupleId}/{expenses,schedules,ddays,categories,budget}` |
 
-- 경로 선택은 `data/repository/UserScope`가 전담한다. 저장소들은 uid를 직접 알지 못하고 `UserScope.uid`(Firebase Auth 상태 스트림)와 `requireUserDoc()`만 쓴다 — 연결 기능이 들어와도 저장소 4개는 손대지 않고 `UserScope`만 분기시키면 된다.
+- 경로 선택은 `data/repository/UserScope`가 전담한다. 저장소들은 경로를 직접 계산하지 않고 아래 두 가지만 쓴다.
+
+  ```kotlin
+  val scope: Flow<DocumentReference?>       // 커플이 있으면 couples/{id}, 없으면 users/{uid}, 미로그인이면 null
+  fun requireScopeDoc(): DocumentReference  // 쓰기용. 위 스트림의 최신값 캐시
+  ```
+
+- **연결 여부 판정의 SSOT는 `couples` 쿼리다** — `couples.where("memberIds", "array-contains", uid).limit(1)` 스냅샷 리스너. `users/{uid}.coupleId` 필드를 판정에 쓰지 않는 이유는 상대가 내 문서를 쓸 수 있는 창구를 최소로 유지하기 위해서다. 성사 배치의 일부가 유실돼 `coupleId`가 비어도 쿼리는 커플을 찾아내고, 앱이 자기 문서의 `coupleId`를 조용히 다시 채운다(self-heal).
+- **예외 — 프로필(생일/기념일)은 연결 후에도 `users/{uid}`에 남는다.** 각자의 개인 정보라 공동 경로로 옮기지 않는다. `FirestoreProfileRepository`만 `scope`를 쓰지 않고 계속 사용자 문서를 직접 본다. (상대 생일을 디데이에 띄울지는 아래 미확정 사항 참고)
 - 연결 성사 시 기존 개인 데이터는 **이관하지 않는다**. 개인 데이터는 그대로 유지되어 본인만 열람하고, 연결 이후 신규 기록만 공동 경로에 쓴다. (PRD 1 "연결 전 데이터는 개인 데이터로 유지, 연결 후 데이터만 공동으로 전환")
 
 ## couples/{coupleId}
 연결된 커플 단위 문서. 하위 컬렉션은 이 문서 기준으로 공유된다.
 
-| 필드 | 설명 |
-|---|---|
-| createdAt | 연결 성사 시각 |
-| memberIds | 배열, 두 users 문서 참조 |
-| deletedAt | null이면 정상. 값이 있으면 유예기간 중 (PRD 9번 연결 해제/탈퇴 정책) — Firestore 보안 규칙에서 이 필드가 있으면 신규 쓰기 차단 |
+**문서 id는 두 uid로부터 결정적으로 만든다** — 사전순으로 정렬한 두 uid를 `_`로 이은 값 (예: `AbC1…_XyZ7…`).
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| memberIds | Array\<String\> | 두 사람의 uid. 항상 2개이고, 정렬해 이으면 문서 id와 같아야 한다 |
+| members | Map | 표시용 프로필 미러 — `{ "<uid>": { displayName, photoUrl, joinedAt } }` |
+| inviteCode | String | 성사에 쓰인 초대 코드. 보안 규칙이 생성 시 검증에 쓴다 |
+| createdAt | Timestamp | 연결 성사 시각 |
+| deletedAt | Timestamp? | null이면 정상. 값이 있으면 유예기간 중 (PRD 9 연결 해제/탈퇴 정책) — 보안 규칙이 신규 쓰기를 차단 |
+
+**왜 결정적 id인가**
+1. 같은 두 사람에 대한 문서가 항상 하나라, 경합으로 커플 문서가 둘 생기는 사고가 원천 차단된다.
+2. 보안 규칙이 문서 id와 `memberIds`의 일치를 검증할 수 있다 — 랜덤 id면 불가능하다.
+3. 재연결이 같은 문서로 돌아온다. PRD 9의 "유예기간 중 재연결 시 데이터 복원"이 `deletedAt`을 지우는 것으로 끝난다.
+
+**왜 `members`를 맵으로 두는가**
+- `users/{uid}`는 본인만 읽을 수 있어 상대의 이름·사진을 가져올 수 없다. 규칙을 푸는 대신 표시용 최소 정보만 커플 문서에 복제한다.
+- 서브컬렉션이 아닌 이유: 커플 문서를 만드는 **같은 배치** 안에서 서브컬렉션 쓰기 규칙이 아직 존재하지 않는 부모 문서를 참조해야 해서 검증이 꼬인다. 맵은 커플 문서 생성 규칙 하나로 함께 검증된다.
+- 채우는 시점은 성사 배치 한 번뿐이다. 상대 항목의 `photoUrl`은 초대 문서에 사진을 담지 않기로 해서 비어 있고, 표시 이름도 그 뒤 상대가 구글 프로필을 바꾸면 낡는다. **아직 갱신 경로가 없다** — 지금은 사진을 쓰는 화면이 없어(공용 아이콘으로 그린다) 드러나지 않지만, 프로필 사진을 실제로 띄우게 되면 각자 앱을 열 때 자기 항목을 다시 쓰는 처리가 필요하다.
+- 감수하는 부작용: 두 사람이 서로의 표시 이름을 덮어쓸 수 있다. 연결된 당사자 사이라 수용한다.
 
 ### {expenses}/{expenseId}
 지출 내역. (PRD 4. 가계부) — `users/{userId}/expenses` / `couples/{coupleId}/expenses` **공통 필드 스키마**.
 
-| 필드 | 타입 | 설명 |
-|---|---|---|
-| amount | Long | 금액 (원 단위 정수) |
-| spentAt | Timestamp | 지출 일시 (날짜+시간 입력을 합쳐 저장). **날짜별 그룹 헤더**의 소스 |
-| yearMonth | String | `"2026-08"` 형식. 월 단위 등가(equality) 조회 키 (Timestamp range 대신 저비용 조회) |
-| spenderId | String (uid) | 지출자. 미연결 시 항상 본인 uid, 연결 후 나/배우자 |
-| categoryId | String | categories 문서 id 참조 |
-| categoryName | String | 표시용 denormalize (카테고리 비활성화·이름변경 후에도 과거 지출 표시 안정) |
-| categoryIcon | String | 표시용 denormalize (아이콘 키) |
-| memo | String? | 메모 |
-| createdAt | Timestamp | 등록 시각. **전체보기 정렬 = 입력 시간순**(PRD 4)의 정렬 키 |
-| updatedAt | Timestamp | 수정 시각 |
+| 필드 | 타입 | 구현 | 설명 |
+|---|---|---|---|
+| amount | Long | ✅ | 금액 (원 단위 정수) |
+| spentAtMillis | Long | ✅ | 지출 일시 (UTC millis, 날짜+시간 합산). **날짜별 그룹 헤더**의 소스 |
+| spenderId | String (uid) | ➕ | 지출자의 uid |
+| createdAtMillis | Long | ✅ | 등록 시각. **전체보기 정렬 = 입력 시간순**(PRD 4)의 정렬 키 |
+| categoryName | String | ✅ | 표시용 denormalize (카테고리 비활성화·이름변경 후에도 과거 지출 표시 안정) |
+| memo | String? | ✅ | 메모 |
+| categoryId | String | ⬜ | categories 문서 id 참조 |
+| categoryIcon | String | ⬜ | 표시용 denormalize (아이콘 키) |
+| yearMonth | String | ⬜ | `"2026-08"` 형식. 필터 조합용 등가 조회 키 |
+| updatedAtMillis | Long | ⬜ | 수정 시각 |
 
-**정렬/그룹**: 리스트 정렬 키는 `createdAt`, 날짜 그룹 헤더는 `spentAt`. (두 값을 분리 저장하는 이유 — 지출 발생일과 입력 순서가 다를 수 있음)
+> ✅ 구현됨 · ➕ 상대방 연결과 함께 추가 · ⬜ 아직 미구현(카테고리/필터 기능 도입 시)
+>
+> 날짜를 Timestamp가 아닌 `*Millis`(Long)로 두는 것은 schedules·ddays와 같은 이유이며, 현재 코드도 그렇게 저장한다. 월 조회는 `spentAtMillis` 범위 쿼리를 쓰고 있어 `yearMonth`는 아직 필요하지 않다 — 카테고리·지출자 필터가 붙어 복합 인덱스가 늘어날 때 도입한다.
+
+**지출자를 uid로 저장한다 (연결 도입과 함께 바뀌는 지점)**
+
+지금 코드는 `spender` 필드에 `"ME"` / `"PARTNER"`라는 **보는 사람 기준 상대값**을 저장한다. 개인 경로에서는 문제가 없지만 공동 경로에서는 깨진다 — A가 저장한 `"ME"`를 B가 읽으면 "나"로 보인다.
+
+- 저장은 `spenderId`(uid), 표시는 상대적으로: 읽을 때 `spenderId == 내 uid ? 나 : 배우자`.
+- 도메인 모델의 `Spender` enum(`ME`/`PARTNER`)은 그대로 둔다. UI는 손대지 않고 Repository가 uid ↔ enum 매핑을 담당한다.
+- **하위호환**: 기존 개인 경로 문서에는 `spenderId`가 없다. 없으면 예전 `spender` 필드로 폴백한다. 개인 데이터는 본인만 열람하므로 폴백 결과가 항상 옳고, 마이그레이션이 필요 없다.
+
+**정렬/그룹**: 리스트 정렬 키는 `createdAtMillis`, 날짜 그룹 헤더는 `spentAtMillis`. (두 값을 분리 저장하는 이유 — 지출 발생일과 입력 순서가 다를 수 있음)
 
 **쿼리 시나리오와 필요한 복합 인덱스**
 
 | 화면/필터 | 쿼리 | 필요 인덱스 |
 |---|---|---|
-| 월 전체보기 | `where yearMonth == ? orderBy createdAt desc` | (yearMonth, createdAt) |
-| + 카테고리 필터 | `where yearMonth == ? where categoryId == ? orderBy createdAt desc` | (yearMonth, categoryId, createdAt) |
-| + 지출자 필터 | `where yearMonth == ? where spenderId == ? orderBy createdAt desc` | (yearMonth, spenderId, createdAt) |
+| 월 전체보기 (현재 구현) | `where spentAtMillis >= ? < ? orderBy spentAtMillis desc` | 단일 필드(자동) |
+| 월 전체보기 (yearMonth 도입 후) | `where yearMonth == ? orderBy createdAtMillis desc` | (yearMonth, createdAtMillis) |
+| + 카테고리 필터 | `where yearMonth == ? where categoryId == ? orderBy createdAtMillis desc` | (yearMonth, categoryId, createdAtMillis) |
+| + 지출자 필터 | `where yearMonth == ? where spenderId == ? orderBy createdAtMillis desc` | (yearMonth, spenderId, createdAtMillis) |
 
 - 기간 필터(월 범위)는 `yearMonth` `in` 조건으로 여러 달을 조회.
 - **메모 검색**: Firestore는 전문검색을 지원하지 않는다. 1차는 로드된 해당 월 결과를 **클라이언트 측 부분일치**로 필터링한다(스코프가 "이번 달"이라 비용 문제 없음). 전역 검색이 필요해지면 외부 검색(Algolia 등) 재검토.
@@ -60,8 +96,12 @@
 | title | String | 제목 |
 | dateMillis | Number | 날짜 (UTC 자정 millis) |
 | minuteOfDay | Number? | 시작 시각(0~1439). **없으면 종일 일정** |
-| type | String | SHARED(우리) / MINE(개인-나) / PARTNER(개인-배우자) |
+| type | String | SHARED(우리 일정) / PERSONAL(개인 일정) |
+| ownerId | String (uid) | 일정 주인. PERSONAL일 때 "나 / 배우자"를 가르는 소스. SHARED에도 등록자 기록용으로 채운다 |
 | createdAtMillis | Number | 등록 시각 |
+
+- **유형도 지출자와 같은 이유로 바뀐다.** 기존 `MINE`/`PARTNER`는 보는 사람 기준 상대값이라 공동 경로에서 뒤집힌다. `PERSONAL` + `ownerId`로 저장하고, 표시할 때 `우리 일정 / 개인(나) / 개인(배우자)` 3종으로 환원한다. 도메인의 `ScheduleType` enum 3종은 유지한다.
+- **하위호환**: `ownerId`가 없는 기존 문서는 예전 `type` 값(`MINE`/`PARTNER`)으로 폴백한다.
 
 - 캘린더가 월 단위로 그려지므로 조회도 월 단위(`dateMillis` 범위 쿼리 + 오름차순)로 한다.
 - 날짜와 시각을 한 값으로 합치지 않고 분리한다 — 종일 여부를 `minuteOfDay` 유무로만 표현할 수 있고, 날짜 그룹핑도 추가 계산 없이 된다.
@@ -146,19 +186,90 @@
 
 | 필드 | 타입 | 설명 |
 |---|---|---|
-| coupleId | String? | 연결된 couples 문서 참조, 미연결 시 null |
+| coupleId | String? | 연결된 couples 문서 id, 미연결 시 null. **경로 판정의 SSOT가 아니다** — 아래 참고 |
 | birthdayMillis / anniversaryMillis | Number? | 생일/기념일 (UTC 자정 millis). ddays의 AUTO 항목이 파생되는 source — ddays 컬렉션에 쓰지 않는다 |
+| inviteCode | String? | 지금 발급해 둔 내 초대 코드. `invites`는 `list`를 막아 뒀기 때문에 "내 코드 찾기"를 쿼리로 할 수 없어, 코드를 내 문서에 적어 둔다 |
 | fcmToken | String? | 푸시 발송용 |
 | notificationSettings | Map | 알림 종류별 on/off (PRD 8. 알림 표 기준) |
 
+- `coupleId`의 쓰임: ① 보안 규칙이 "이미 다른 사람과 연결된 사용자인가"를 판정하는 근거 ② 향후 Cloud Functions/FCM이 uid만 가지고 커플 경로를 찾는 지름길. 앱의 경로 판정은 `couples` 쿼리로 하고, 이 필드는 값이 어긋나면 조용히 다시 채운다(맨 위 "개인/공동 이중 경로 원칙" 참고).
+- **`coupleId` 키는 항상 존재해야 한다.** 보안 규칙이 `resource.data.coupleId == null`을 평가하는데, 키 자체가 없으면 규칙이 오류로 거절된다. `FirebaseAuthRepository`의 최초 사용자 문서 생성이 `coupleId: null`을 심는 것이 이 전제를 만든다.
 - 날짜를 Timestamp가 아닌 millis로 두는 이유는 ddays/schedules와 같다 — 시각 없는 '날짜'라서 타임존 해석이 끼어들 여지를 없앤다.
 - 로그인한 사용자의 `users/{uid}` 문서에 프로필 필드만 merge로 쓴다. (같은 문서에 로그인/계정 필드가 함께 살기 때문)
 
-## 보안 규칙 (`firestore.rules`에 반영됨)
-- `users/{userId}/**`: 본인만 read/write.
-- `couples/{coupleId}/**`: `memberIds`에 포함된 uid만 read/write.
-- `couples/{coupleId}`에 `deletedAt`가 있으면 신규 쓰기 차단(유예기간), 열람만 허용. (PRD 9)
+## 상대방 연결 (PRD 9)
+
+Cloud Functions 없이 **클라이언트 쓰기 + 보안 규칙**만으로 두 사용자 문서를 동시에 바꾼다.
+
+### invites/{code}
+초대 코드. **문서 id가 코드 자체**다 — 수락자가 `get` 한 번으로 검증할 수 있고, 쿼리를 쓰지 않아 `list` 권한(=코드 전수 조회)을 열 필요가 없다.
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| inviterUid | String | 코드 발급자 |
+| inviterName | String? | 수락 화면의 "○○님과 연결할까요?" 표시용 |
+| createdAt | Timestamp | 발급 시각 |
+| expiresAt | Timestamp | `createdAt + 30분` |
+
+- **코드 규격**: Crockford Base32 6자리 — `0-9`와 `A-Z`에서 혼동 문자 `I`, `L`, `O`, `U`를 뺀 32글자. 약 10.7억(32⁶) 조합.
+  - 입력은 대문자로 올린 뒤 Crockford 관례대로 헷갈리는 글자를 숫자로 접는다(`I`·`L` → `1`, `O` → `0`). 손으로 옮겨 적다 나는 오타를 실패로 만들지 않기 위한 것.
+  - 규격은 `domain/model/InviteCode.kt`에 있다 — 발급(:data)과 입력 정규화(UI)가 같은 값을 봐야 한다.
+- **발급**: 사용자당 유효 코드 1개. 무작위 코드로 `create`를 시도하고(이미 있으면 실패) 충돌 시 최대 5회 재생성한다. 새로 만들면 이전 코드는 삭제한다.
+- **소진**: 성사 배치에서 삭제한다. 삭제가 유실돼도 규칙의 "발급자가 이미 연결됨" 검사에 걸려 재사용되지 않는다.
+- **사진 URL은 담지 않는다** — 코드를 맞힌 사람에게 노출되는 정보를 표시 이름 하나로 줄인다.
+
+> **유효기간은 클라이언트 시계로 찍는다**: `expiresAt`을 서버 타임스탬프로 계산하려면 서버 코드가 필요하다. 대신 규칙이 발급·사용 두 시점 모두에서 `expiresAt > request.time`(서버 시각)을 확인하므로, **서버 시각 기준으로 만료된 코드는 절대 사용되지 않는다**. 기기 시계를 앞당기면 자기 코드의 수명을 늘릴 수 있지만 남의 코드에는 영향이 없어 그대로 둔다.
+
+> **감수하는 트레이드오프**: 서버가 없어 코드 무작위 대입에 요청 빈도 제한을 걸 수 없다. 완화책은 ① 10.7억 조합 ② 30분 유효 ③ 1회용 ④ `list` 금지(단건 `get`만) ⑤ 성공해도 얻는 것은 발급자 표시 이름뿐이고 가계부·일정 데이터에는 접근할 수 없음. 요청 빈도 제한이 필요해지면 Cloud Functions callable로 이 컬렉션을 감싸면 되고, 나머지 데이터 모델은 그대로 쓴다.
+
+### 성사 — 단일 WriteBatch
+
+수락자 B가 코드를 확인한 뒤(만료·본인 코드 등은 클라이언트가 먼저 걸러 안내), **하나의 배치**를 커밋한다.
+
+| # | 쓰기 | 규칙이 검증하는 것 |
+|---|---|---|
+| 1 | `couples/{A_B}` create | 문서 id == 정렬한 `memberIds`, 초대 코드 유효, 발급자가 상대와 일치, 양쪽 모두 `coupleId == null` |
+| 2 | `users/{A}` update — `coupleId`만 | `coupleId`가 비어 있었고, 그 한 필드만 바뀌며, `getAfter`로 본 커플 문서에 두 사람이 모두 멤버 |
+| 3 | `users/{B}` update — `coupleId`만 | 위와 동일 |
+| 4 | `invites/{CODE}` delete | 로그인 상태 |
+
+- **2·3번이 `getAfter()`를 쓰는 것이 이 설계의 핵심이다.** 커플 문서는 같은 배치에서 만들어져서 `get()`(커밋 전 상태)으로는 보이지 않는다. `getAfter()`가 배치 커밋 후 상태를 보기 때문에, 서버 코드 없이도 "커플 문서가 실제로 만들어졌을 때만 상대의 `coupleId`를 채울 수 있다"가 강제된다.
+- 배치는 읽기를 할 수 없다. 만료 검사 같은 사전 검증은 클라이언트가 하지만 그건 UX용이고, **최종 방어선은 규칙이다.**
+- 발급자 A는 자기 화면에서 커플 문서를 실시간 구독하고 있어 성사 즉시 완료 화면으로 넘어간다.
+- 규칙의 문서 접근 횟수: 1번이 5회(초대 문서 존재/발급자/만료 + 양쪽 사용자), 2·3번이 각 2회 = 배치 전체 9회. 배치 한도(20회) 안이다.
+
+## 보안 규칙
+
+실물은 **[`firestore.rules`](../firestore.rules)** 다. 설계 의도만 여기 적고 규칙 본문은 옮겨 적지 않는다 — 두 벌을 두면 반드시 어긋난다.
+
+| 경로 | 규칙 요지 |
+|---|---|
+| `invites/{code}` | `get`만 허용하고 `list`는 막는다(코드 전수 조회 차단). `create`는 본인이 발급자일 때만, `update`는 아예 막아 코드 충돌이 거절로 드러나게 한다 |
+| `users/{userId}` | 본인만 read/write. **예외 하나** — 연결 성사 순간에 상대가 내 `coupleId` 한 필드를 채우는 것 |
+| `couples/{coupleId}` | `memberIds`에 있는 uid만 접근. `create`는 초대 코드 검증을 통과할 때만, `delete`는 막는다(해제는 `deletedAt` 마킹) |
+| `couples/{coupleId}/**` | 멤버만 read. write는 `deletedAt`이 없을 때만(유예기간 중 열람만) |
+
+**`users`의 두 번째 `allow update`가 이 설계에서 새로 여는 유일한 구멍이다.** 세 겹으로 좁혀 둔다 — ① `coupleId`가 비어 있을 때만 ② 그 필드 하나만 ③ `getAfter()`로 본 커플 문서에 두 사람이 모두 멤버일 때만. 개인 데이터 하위 컬렉션은 `match /{document=**}`가 본인 전용으로 계속 잠근다.
+
+**클라이언트가 미리 못 잡는 실패**: 상대의 `users` 문서는 읽을 수 없으므로 "상대가 이미 다른 사람과 연결됨"은 규칙 거절(`PERMISSION_DENIED`)로만 알 수 있다. 화면 문구 매핑은 wireframe/connect.md "상태 분기 종합" 참고.
+
+**규칙 ↔ 실패 케이스 대응** (connect.md "상태 분기 종합"과 1:1)
+
+| 실패 | 규칙 조건 |
+|---|---|
+| 없는 코드 | `exists(inviteDoc(code))` |
+| 만료된 코드 | `expiresAt > request.time` |
+| 본인이 발급한 코드 | `partnerOf(memberIds) != request.auth.uid` |
+| 내가 이미 연결됨 | `unpaired(request.auth.uid)` |
+| 상대가 이미 연결됨 | `unpaired(inviterUid)` |
+| 남의 코드로 엉뚱한 사람과 묶기 | `get(inviteDoc(code)).data.inviterUid == partnerOf(memberIds)` |
+| 문서 id 위조 | `coupleId == coupleIdOf(memberIds[0], memberIds[1])` |
+
+QR 형식 오류와 네트워크 오류는 규칙 이전 단계라 클라이언트만 처리한다.
 
 ## 미확정 사항
 - 기본 카테고리 최종 목록과 아이콘 키 (design-brief 대조 후 확정)
 - 카테고리별 예산 향후 도입 여부 (PRD 10 남은 결정 필요 사항)
+- **상대 생일/기념일의 디데이 반영** — 프로필을 개인 경로에 두기로 해서 상대 생일을 읽을 수 없다. `couples.members`에 생일까지 미러링할지, 디데이 AUTO 항목은 각자 것만 볼지 결정 필요 (PRD 6과 직결)
+- **연결 성사 시 커플 카테고리 시드 시점** — 성사 배치에 넣을지, 카테고리 기능 구현 시로 미룰지. 배치에 넣으면 규칙의 문서 접근 한도와 쓰기 개수를 다시 계산해야 한다
+- **연결 해제 후 유예기간 중 공동 데이터 열람 동선** — 경로가 개인으로 되돌아가면 공동 데이터가 어느 화면에도 노출되지 않는다. 해제 설계 시 함께 정한다

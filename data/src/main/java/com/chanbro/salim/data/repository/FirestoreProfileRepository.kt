@@ -18,6 +18,9 @@ import javax.inject.Singleton
  *
  * 이 문서에는 로그인/계정 필드(providers, lastLoginAt 등)가 함께 살기 때문에
  * 프로필 필드만 merge로 덮어쓴다. (firestore-schema.md users 섹션)
+ *
+ * **다른 저장소와 달리 연결 후에도 공동 경로로 옮기지 않는다** — 생일/기념일은
+ * 각자의 개인 정보라 커플 문서에 두지 않기로 했다. (firestore-schema.md 이중 경로 원칙의 예외)
  */
 @Singleton
 class FirestoreProfileRepository @Inject constructor(
@@ -52,6 +55,7 @@ class FirestoreProfileRepository @Inject constructor(
             "birthdayMillis" to profile.birthdayMillis,
             "anniversaryMillis" to profile.anniversaryMillis,
         )
-        userScope.requireUserDoc().set(data, SetOptions.merge()).await()
+        val uid = userScope.currentUid() ?: error("로그인 상태가 아닌데 프로필을 저장하려 했다")
+        userScope.userDoc(uid).set(data, SetOptions.merge()).await()
     }
 }

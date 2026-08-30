@@ -27,10 +27,10 @@ class FirestoreBudgetRepository @Inject constructor(
 
     @OptIn(ExperimentalCoroutinesApi::class)
     override fun observe(year: Int, month: Int): Flow<Budget?> =
-        userScope.uid.flatMapLatest { uid ->
-            if (uid == null) return@flatMapLatest flowOf(null)
+        userScope.scope.flatMapLatest { scope ->
+            if (scope == null) return@flatMapLatest flowOf(null)
             callbackFlow {
-                val listener = document(userScope.userDoc(uid), year, month)
+                val listener = document(scope.doc, year, month)
                     .addSnapshotListener { snapshot, error ->
                         if (error != null) {
                             close(error)
@@ -44,12 +44,12 @@ class FirestoreBudgetRepository @Inject constructor(
         }
 
     override suspend fun save(budget: Budget) {
-        document(userScope.requireUserDoc(), budget.year, budget.month)
+        document(userScope.requireScope().doc, budget.year, budget.month)
             .set(mapOf("amount" to budget.amount))
             .await()
     }
 
-    private fun document(userDoc: DocumentReference, year: Int, month: Int) = userDoc
+    private fun document(scopeDoc: DocumentReference, year: Int, month: Int) = scopeDoc
         .collection("budget")
         .document(documentId(year, month))
 

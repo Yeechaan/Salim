@@ -36,8 +36,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.chanbro.salim.core.ui.theme.SalimTheme
 import com.chanbro.salim.core.ui.theme.SalimTokens
+import com.chanbro.salim.domain.model.Connection
+import com.chanbro.salim.ui.connect.ConnectViewModel
 import com.chanbro.salim.ui.common.DatePickerModal
 import com.chanbro.salim.ui.common.FieldDivider
 import com.chanbro.salim.ui.common.FieldRow
@@ -64,7 +67,11 @@ fun ExpenseInputScreen(
     onSave: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ExpenseInputViewModel = hiltViewModel(),
+    connectViewModel: ConnectViewModel = hiltViewModel(),
 ) {
+    // 미연결이면 모든 지출이 본인 것이라 지출자를 고를 이유가 없다. (expense.md 4-2)
+    val connection by connectViewModel.connection.collectAsStateWithLifecycle()
+    val connected = connection is Connection.Connected
     var amountDigits by rememberSaveable { mutableStateOf("") }
     var spender by rememberSaveable { mutableStateOf(spenders.first()) }
     var category by rememberSaveable { mutableStateOf(quickCategories.first()) }
@@ -102,13 +109,15 @@ fun ExpenseInputScreen(
                 FieldDivider()
                 FieldRow(label = "시간", value = formatTime(hour, minute), onClick = { showTimePicker = true })
                 FieldDivider()
-                ChipsField(
-                    label = "지출자",
-                    options = spenders,
-                    selected = spender,
-                    onSelect = { spender = it },
-                )
-                FieldDivider()
+                if (connected) {
+                    ChipsField(
+                        label = "지출자",
+                        options = spenders,
+                        selected = spender,
+                        onSelect = { spender = it },
+                    )
+                    FieldDivider()
+                }
                 CategoryField(
                     selected = category,
                     onSelect = { category = it },
@@ -123,7 +132,8 @@ fun ExpenseInputScreen(
             onClick = {
                 viewModel.save(
                     amount = amountDigits.toLongOrNull() ?: 0L,
-                    spenderLabel = spender,
+                    // 칩을 숨긴 상태에서 이전 선택이 남아 있어도 본인으로 저장한다.
+                    spenderLabel = if (connected) spender else spenders.first(),
                     categoryName = category,
                     memo = memo,
                     dateUtcMillis = dateMillis,

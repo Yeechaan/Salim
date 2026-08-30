@@ -3,14 +3,16 @@ package com.chanbro.salim.ui.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.chanbro.salim.domain.model.Budget
+import com.chanbro.salim.domain.model.Connection
 import com.chanbro.salim.domain.usecase.ObserveBudgetUseCase
+import com.chanbro.salim.domain.usecase.ObserveConnectionUseCase
 import com.chanbro.salim.domain.usecase.SaveBudgetUseCase
 import com.chanbro.salim.domain.usecase.SignOutUseCase
 import com.chanbro.salim.ui.common.formatThousands
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.Calendar
@@ -20,6 +22,7 @@ data class SettingsUiState(
     val year: Int = 0,
     val month: Int = 0,
     val budgetAmount: Long? = null,
+    val connection: Connection = Connection.Unknown,
 ) {
     /** 목록 우측에 노출할 현재 예산값. 미설정이면 안내 문구. (wireframe/settings.md 3.) */
     val budgetText: String
@@ -29,6 +32,7 @@ data class SettingsUiState(
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     observeBudget: ObserveBudgetUseCase,
+    observeConnection: ObserveConnectionUseCase,
     private val saveBudget: SaveBudgetUseCase,
     private val signOut: SignOutUseCase,
 ) : ViewModel() {
@@ -37,14 +41,17 @@ class SettingsViewModel @Inject constructor(
     private val yearMonth = currentYearMonth()
 
     val uiState: StateFlow<SettingsUiState> =
-        observeBudget(yearMonth.first, yearMonth.second)
-            .map {
-                SettingsUiState(
-                    year = yearMonth.first,
-                    month = yearMonth.second,
-                    budgetAmount = it?.amount,
-                )
-            }
+        combine(
+            observeBudget(yearMonth.first, yearMonth.second),
+            observeConnection(),
+        ) { budget, connection ->
+            SettingsUiState(
+                year = yearMonth.first,
+                month = yearMonth.second,
+                budgetAmount = budget?.amount,
+                connection = connection,
+            )
+        }
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5_000),

@@ -39,22 +39,27 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.chanbro.salim.R
 import com.chanbro.salim.core.ui.theme.SalimTheme
 import com.chanbro.salim.core.ui.theme.SalimTokens
+import com.chanbro.salim.domain.model.Connection
 import com.chanbro.salim.ui.common.BudgetInputSheet
 import com.chanbro.salim.ui.common.SalimCard
 import com.chanbro.salim.ui.common.SalimType
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 // ---------------------------------------------------------------------------
 // 설정 (settings.md 7) — 탭 랜딩 화면
 //
-// 로그아웃은 구글 로그인(PRD 1)이 붙으면서 실제로 동작한다.
-// 연결 상태 / 연결 해제는 커플 연결(PRD 9)이, 회원탈퇴는 30일 유예 정책상 Cloud Functions가
-// 아직 없어 비활성으로만 노출한다. 동작하는 것처럼 보이지 않도록 muted 처리하고 탭도 막는다.
+// 로그아웃은 구글 로그인(PRD 1)이, 연결 상태 카드는 상대방 연결(PRD 9)이 붙으면서 동작한다.
+// 연결 해제와 회원탈퇴는 30일 유예 삭제에 서버 작업이 필요해 아직 비활성으로만 노출한다.
+// 동작하는 것처럼 보이지 않도록 muted 처리하고 탭도 막는다.
 // ---------------------------------------------------------------------------
 
 @Composable
 fun SettingsScreen(
     modifier: Modifier = Modifier,
     onProfileClick: () -> Unit = {},
+    onConnectClick: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -65,6 +70,7 @@ fun SettingsScreen(
         state = state,
         modifier = modifier,
         onProfileClick = onProfileClick,
+        onConnectClick = onConnectClick,
         onBudgetClick = { showBudgetSheet = true },
         onSignOutClick = { confirmingSignOut = true },
     )
@@ -98,6 +104,7 @@ private fun SettingsContent(
     state: SettingsUiState,
     modifier: Modifier = Modifier,
     onProfileClick: () -> Unit,
+    onConnectClick: () -> Unit,
     onBudgetClick: () -> Unit,
     onSignOutClick: () -> Unit,
 ) {
@@ -110,7 +117,7 @@ private fun SettingsContent(
                 .padding(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
-            ConnectionCard()
+            ConnectionCard(state.connection, onConnectClick)
 
             SettingsGroup("일반") {
                 SettingsRow(
@@ -209,15 +216,20 @@ private fun SettingsTopBar() {
                 .padding(horizontal = 20.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("설정", style = SalimType.headlineSm, color = SalimTokens.TextPrimary)
+            Text(
+                stringResource(R.string.settings_title),
+                style = SalimType.headlineSm,
+                color = SalimTokens.TextPrimary,
+            )
         }
     }
 }
 
-/** 미연결 상태 카드. 커플 연결 기능이 붙기 전까지는 안내만 한다. (settings.md 2.) */
+/** 연결 상태 카드. 탭하면 연결 관리 화면으로 간다. (settings.md 2 / connect.md 9-1) */
 @Composable
-private fun ConnectionCard() {
-    SalimCard(cornerRadius = 24.dp) {
+private fun ConnectionCard(connection: Connection, onClick: () -> Unit) {
+    val connected = connection as? Connection.Connected
+    SalimCard(modifier = Modifier.clickable(onClick = onClick), cornerRadius = 24.dp) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -237,13 +249,37 @@ private fun ConnectionCard() {
                     modifier = Modifier.size(24.dp),
                 )
             }
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text("상대방을 연결해보세요", style = SalimType.bodyLg, color = SalimTokens.TextPrimary)
-                Text("연결 기능은 준비 중이에요", style = SalimType.bodySm, color = SalimTokens.TextMuted)
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = connected?.let {
+                        stringResource(R.string.connect_connected, it.partner.nameOrDefault)
+                    } ?: stringResource(R.string.home_connect_banner_title),
+                    style = SalimType.bodyLg,
+                    color = SalimTokens.TextPrimary,
+                )
+                Text(
+                    text = connected?.let {
+                        stringResource(R.string.connect_connected_since, formatConnectedAt(it.connectedAtMillis))
+                    } ?: stringResource(R.string.home_connect_banner_body),
+                    style = SalimType.bodySm,
+                    color = SalimTokens.TextMuted,
+                )
             }
+            Icon(
+                Icons.Filled.ChevronRight,
+                contentDescription = null,
+                tint = SalimTokens.TextMuted,
+                modifier = Modifier.size(20.dp),
+            )
         }
     }
 }
+
+private fun formatConnectedAt(millis: Long): String =
+    SimpleDateFormat("yyyy.MM.dd", Locale.KOREAN).format(Date(millis))
 
 @Composable
 private fun SettingsGroup(title: String, content: @Composable () -> Unit) {
@@ -313,6 +349,7 @@ private fun SettingsScreenPreview() {
             state = SettingsUiState(year = 2026, month = 8, budgetAmount = 1_200_000),
             modifier = Modifier.background(SalimTokens.Background),
             onProfileClick = {},
+            onConnectClick = {},
             onBudgetClick = {},
             onSignOutClick = {},
         )
