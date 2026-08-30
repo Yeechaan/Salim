@@ -4,8 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.chanbro.salim.domain.model.Budget
 import com.chanbro.salim.domain.model.Expense
+import com.chanbro.salim.domain.model.SpenderNames
 import com.chanbro.salim.domain.usecase.ObserveBudgetUseCase
 import com.chanbro.salim.domain.usecase.ObserveMonthExpensesUseCase
+import com.chanbro.salim.domain.usecase.ObserveSpenderNamesUseCase
 import com.chanbro.salim.domain.usecase.SaveBudgetUseCase
 import com.chanbro.salim.ui.common.formatThousands
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -68,6 +70,7 @@ data class HomeUiState(
 class HomeViewModel @Inject constructor(
     observeMonthExpenses: ObserveMonthExpensesUseCase,
     observeBudget: ObserveBudgetUseCase,
+    observeSpenderNames: ObserveSpenderNamesUseCase,
     private val saveBudget: SaveBudgetUseCase,
 ) : ViewModel() {
 
@@ -79,8 +82,9 @@ class HomeViewModel @Inject constructor(
             combine(
                 observeMonthExpenses(year, month),
                 observeBudget(year, month),
-            ) { expenses, budget ->
-                toUiState(year, month, expenses, budget)
+                observeSpenderNames(),
+            ) { expenses, budget, names ->
+                toUiState(year, month, expenses, budget, names)
             }
         }
         .stateIn(
@@ -105,6 +109,7 @@ class HomeViewModel @Inject constructor(
         month: Int,
         expenses: List<Expense>,
         budget: Budget?,
+        names: SpenderNames,
     ): HomeUiState {
         val total = expenses.sumOf { it.amount }
         val categories = expenses
@@ -121,7 +126,7 @@ class HomeViewModel @Inject constructor(
         val recent = expenses
             .sortedByDescending { it.createdAtMillis }
             .take(3)
-            .map { it.toTransactionUi() }
+            .map { it.toTransactionUi(names) }
 
         return HomeUiState(
             year = year,
@@ -133,9 +138,9 @@ class HomeViewModel @Inject constructor(
         )
     }
 
-    private fun Expense.toTransactionUi() = TransactionUi(
+    private fun Expense.toTransactionUi(names: SpenderNames) = TransactionUi(
         title = memo?.takeIf { it.isNotBlank() } ?: categoryName,
-        meta = "$categoryName · ${spender.label} · ${formatShortDate(spentAtMillis)}",
+        meta = "$categoryName · ${names.labelOf(spender)} · ${formatShortDate(spentAtMillis)}",
         amount = "-${formatThousands(amount.toString()).ifEmpty { "0" }}원",
     )
 

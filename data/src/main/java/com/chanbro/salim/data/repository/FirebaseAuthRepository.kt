@@ -48,6 +48,10 @@ class FirebaseAuthRepository @Inject constructor(
      * 최초 가입과 재로그인을 한 번에 처리한다.
      * 최초에만 createdAt/providers/primaryProvider를 심고, 재로그인은 lastLoginAt과
      * 소셜 프로필만 갱신한다 — 두 경우가 같은 트랜잭션 안에서 갈린다.
+     *
+     * **displayName은 재로그인 때 덮어쓰지 않는다.** 설정 > 프로필에서 사용자가 바꿀 수 있는
+     * 값이라(PRD 7), 구글 이름으로 되돌리면 바꾼 이름이 로그인할 때마다 사라진다.
+     * 구글 이름은 최초 가입값(과 비어 있는 문서를 채울 때)으로만 쓴다.
      */
     private suspend fun upsertUserDocument(user: FirebaseUser) {
         val doc = firestore.collection("users").document(user.uid)
@@ -55,16 +59,20 @@ class FirebaseAuthRepository @Inject constructor(
             val snapshot = transaction.get(doc)
             val profile = mapOf(
                 "email" to user.email,
-                "displayName" to user.displayName,
                 "photoUrl" to user.photoUrl?.toString(),
                 "lastLoginAt" to FieldValue.serverTimestamp(),
             )
             if (snapshot.exists()) {
-                transaction.update(doc, profile)
+                val keepName = !snapshot.getString("displayName").isNullOrBlank()
+                transaction.update(
+                    doc,
+                    if (keepName) profile else profile + mapOf("displayName" to user.displayName),
+                )
             } else {
                 transaction.set(
                     doc,
                     profile + mapOf(
+                        "displayName" to user.displayName,
                         "providers" to listOf(PROVIDER_GOOGLE),
                         "primaryProvider" to PROVIDER_GOOGLE,
                         "createdAt" to FieldValue.serverTimestamp(),

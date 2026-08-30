@@ -6,6 +6,7 @@ import com.chanbro.salim.domain.model.Budget
 import com.chanbro.salim.domain.model.Connection
 import com.chanbro.salim.domain.usecase.ObserveBudgetUseCase
 import com.chanbro.salim.domain.usecase.ObserveConnectionUseCase
+import com.chanbro.salim.domain.usecase.ObserveProfileUseCase
 import com.chanbro.salim.domain.usecase.SaveBudgetUseCase
 import com.chanbro.salim.domain.usecase.SignOutUseCase
 import com.chanbro.salim.ui.common.formatThousands
@@ -23,16 +24,22 @@ data class SettingsUiState(
     val month: Int = 0,
     val budgetAmount: Long? = null,
     val connection: Connection = Connection.Unknown,
+    val profileName: String? = null,
 ) {
     /** 목록 우측에 노출할 현재 예산값. 미설정이면 안내 문구. (wireframe/settings.md 3.) */
     val budgetText: String
         get() = budgetAmount?.let { "${formatThousands(it.toString())}원" } ?: "미설정"
+
+    /** 프로필 줄 우측 값. 이름을 정했으면 그 이름이 가장 알아보기 쉽다. */
+    val profileText: String
+        get() = profileName?.takeIf { it.isNotBlank() } ?: "이름 · 생일 · 기념일"
 }
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     observeBudget: ObserveBudgetUseCase,
     observeConnection: ObserveConnectionUseCase,
+    observeProfile: ObserveProfileUseCase,
     private val saveBudget: SaveBudgetUseCase,
     private val signOut: SignOutUseCase,
 ) : ViewModel() {
@@ -44,12 +51,14 @@ class SettingsViewModel @Inject constructor(
         combine(
             observeBudget(yearMonth.first, yearMonth.second),
             observeConnection(),
-        ) { budget, connection ->
+            observeProfile(),
+        ) { budget, connection, profile ->
             SettingsUiState(
                 year = yearMonth.first,
                 month = yearMonth.second,
                 budgetAmount = budget?.amount,
                 connection = connection,
+                profileName = profile.displayName,
             )
         }
             .stateIn(

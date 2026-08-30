@@ -122,7 +122,7 @@ private fun SettingsContent(
             SettingsGroup("일반") {
                 SettingsRow(
                     label = "프로필 수정",
-                    value = "생일 · 기념일",
+                    value = state.profileText,
                     onClick = onProfileClick,
                 )
                 RowDivider()

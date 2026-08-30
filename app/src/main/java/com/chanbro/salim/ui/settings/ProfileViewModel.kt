@@ -26,9 +26,14 @@ class ProfileViewModel @Inject constructor(
             initialValue = null,
         )
 
-    fun save(birthdayMillis: Long?, anniversaryMillis: Long?, onDone: () -> Unit) {
+    fun save(
+        displayName: String?,
+        birthdayMillis: Long?,
+        anniversaryMillis: Long?,
+        onDone: () -> Unit,
+    ) {
         viewModelScope.launch {
-            saveProfile(UserProfile(birthdayMillis, anniversaryMillis))
+            saveProfile(UserProfile(displayName, birthdayMillis, anniversaryMillis))
             onDone()
         }
     }
