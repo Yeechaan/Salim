@@ -3,13 +3,16 @@ package com.chanbro.salim.ui.expense
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.chanbro.salim.domain.model.Expense
+import com.chanbro.salim.domain.model.SpenderNames
 import com.chanbro.salim.domain.usecase.ObserveMonthExpensesUseCase
+import com.chanbro.salim.domain.usecase.ObserveSpenderNamesUseCase
 import com.chanbro.salim.ui.common.formatThousands
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -43,14 +46,23 @@ data class ExpenseListUiState(
 @HiltViewModel
 class ExpenseListViewModel @Inject constructor(
     observeMonth: ObserveMonthExpensesUseCase,
+    observeSpenderNames: ObserveSpenderNamesUseCase,
 ) : ViewModel() {
 
     private val yearMonth = MutableStateFlow(2026 to 8)
 
+    /** 달을 결과와 함께 들고 다닌다 — 따로 combine하면 달이 먼저 바뀌어 헤더와 목록이 어긋난다. */
+    private data class MonthExpenses(val year: Int, val month: Int, val expenses: List<Expense>)
+
     @OptIn(ExperimentalCoroutinesApi::class)
-    val uiState: StateFlow<ExpenseListUiState> = yearMonth
+    private val monthExpenses = yearMonth
         .flatMapLatest { (year, month) ->
-            observeMonth(year, month).map { expenses -> toUiState(year, month, expenses) }
+            observeMonth(year, month).map { MonthExpenses(year, month, it) }
+        }
+
+    val uiState: StateFlow<ExpenseListUiState> =
+        combine(monthExpenses, observeSpenderNames()) { month, names ->
+            toUiState(month.year, month.month, month.expenses, names)
         }
         .stateIn(
             scope = viewModelScope,
@@ -62,7 +74,12 @@ class ExpenseListViewModel @Inject constructor(
         yearMonth.value = year to month
     }
 
-    private fun toUiState(year: Int, month: Int, expenses: List<Expense>): ExpenseListUiState {
+    private fun toUiState(
+        year: Int,
+        month: Int,
+        expenses: List<Expense>,
+        names: SpenderNames,
+    ): ExpenseListUiState {
         val total = expenses.sumOf { it.amount }
         val days = expenses
             .groupBy { dayStartUtc(it.spentAtMillis) }
@@ -71,7 +88,7 @@ class ExpenseListViewModel @Inject constructor(
             .map { (dayMillis, items) ->
                 ExpenseDayUi(
                     dateHeader = formatDayHeader(dayMillis),
-                    rows = items.map { it.toRowUi() },
+                    rows = items.map { it.toRowUi(names) },
                 )
             }
         return ExpenseListUiState(
@@ -82,10 +99,10 @@ class ExpenseListViewModel @Inject constructor(
         )
     }
 
-    private fun Expense.toRowUi() = ExpenseRowUi(
+    private fun Expense.toRowUi(names: SpenderNames) = ExpenseRowUi(
         categoryName = categoryName,
         title = memo?.takeIf { it.isNotBlank() } ?: categoryName,
-        meta = "$categoryName · ${spender.label}",
+        meta = "$categoryName · ${names.labelOf(spender)}",
         amount = "-${formatThousands(amount.toString())}원",
     )
 

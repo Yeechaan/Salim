@@ -39,8 +39,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.chanbro.salim.core.ui.theme.SalimTheme
 import com.chanbro.salim.core.ui.theme.SalimTokens
-import com.chanbro.salim.domain.model.Connection
-import com.chanbro.salim.ui.connect.ConnectViewModel
+import com.chanbro.salim.domain.model.Spender
+import com.chanbro.salim.domain.model.SpenderNames
 import com.chanbro.salim.ui.common.DatePickerModal
 import com.chanbro.salim.ui.common.FieldDivider
 import com.chanbro.salim.ui.common.FieldRow
@@ -54,7 +54,6 @@ import com.chanbro.salim.ui.common.ThousandsTransformation
 import com.chanbro.salim.ui.common.todayUtcMillis
 import java.util.Calendar
 
-private val spenders = listOf("나", "배우자")
 private val quickCategories = listOf("식비", "카페", "교통", "문화/여가", "생활")
 
 // ---------------------------------------------------------------------------
@@ -67,13 +66,11 @@ fun ExpenseInputScreen(
     onSave: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ExpenseInputViewModel = hiltViewModel(),
-    connectViewModel: ConnectViewModel = hiltViewModel(),
 ) {
     // 미연결이면 모든 지출이 본인 것이라 지출자를 고를 이유가 없다. (expense.md 4-2)
-    val connection by connectViewModel.connection.collectAsStateWithLifecycle()
-    val connected = connection is Connection.Connected
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     var amountDigits by rememberSaveable { mutableStateOf("") }
-    var spender by rememberSaveable { mutableStateOf(spenders.first()) }
+    var spender by rememberSaveable { mutableStateOf(Spender.ME) }
     var category by rememberSaveable { mutableStateOf(quickCategories.first()) }
     var memo by rememberSaveable { mutableStateOf("") }
     var dateMillis by rememberSaveable { mutableLongStateOf(todayUtcMillis()) }
@@ -109,10 +106,9 @@ fun ExpenseInputScreen(
                 FieldDivider()
                 FieldRow(label = "시간", value = formatTime(hour, minute), onClick = { showTimePicker = true })
                 FieldDivider()
-                if (connected) {
-                    ChipsField(
-                        label = "지출자",
-                        options = spenders,
+                if (state.connected) {
+                    SpenderField(
+                        names = state.names,
                         selected = spender,
                         onSelect = { spender = it },
                     )
@@ -133,7 +129,7 @@ fun ExpenseInputScreen(
                 viewModel.save(
                     amount = amountDigits.toLongOrNull() ?: 0L,
                     // 칩을 숨긴 상태에서 이전 선택이 남아 있어도 본인으로 저장한다.
-                    spenderLabel = if (connected) spender else spenders.first(),
+                    spender = if (state.connected) spender else Spender.ME,
                     categoryName = category,
                     memo = memo,
                     dateUtcMillis = dateMillis,
@@ -213,21 +209,25 @@ private fun AmountInput(digits: String, onDigitsChange: (String) -> Unit) {
     }
 }
 
+/** 칩 라벨은 설정 > 프로필의 이름과 상대 이름을 쓴다. 이름이 없으면 "나"/"배우자". */
 @Composable
-private fun ChipsField(
-    label: String,
-    options: List<String>,
-    selected: String,
-    onSelect: (String) -> Unit,
+private fun SpenderField(
+    names: SpenderNames,
+    selected: Spender,
+    onSelect: (Spender) -> Unit,
 ) {
     Column(
         modifier = Modifier.padding(vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(label, style = SalimType.bodyMd, color = SalimTokens.TextMuted)
+        Text("지출자", style = SalimType.bodyMd, color = SalimTokens.TextMuted)
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            options.forEach { opt ->
-                SalimChip(label = opt, selected = opt == selected, onClick = { onSelect(opt) })
+            Spender.entries.forEach { option ->
+                SalimChip(
+                    label = names.labelOf(option),
+                    selected = option == selected,
+                    onClick = { onSelect(option) },
+                )
             }
         }
     }
