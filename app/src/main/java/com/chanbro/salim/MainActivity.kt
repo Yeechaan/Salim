@@ -63,6 +63,7 @@ import com.chanbro.salim.ui.schedule.todayUtc
 private const val ROUTE_ONBOARDING = "onboarding"
 private const val ROUTE_LOGIN = "login"
 private const val ROUTE_EXPENSE_INPUT = "expense_input"
+private const val ROUTE_EXPENSE_EDIT = "expense_edit/{expenseId}"
 private const val ROUTE_DDAY_INPUT = "dday_input"
 private const val ROUTE_DDAY_EDIT = "dday_edit/{ddayId}"
 private const val ROUTE_SCHEDULE_INPUT = "schedule_input/{dateMillis}"
@@ -80,6 +81,8 @@ private fun connectCodeRoute(code: String? = null): String =
     if (code == null) "connect_code" else "connect_code?code=${Uri.encode(code)}"
 
 private fun scheduleInputRoute(dateMillis: Long): String = "schedule_input/$dateMillis"
+
+private fun expenseEditRoute(expenseId: String): String = "expense_edit/${Uri.encode(expenseId)}"
 private fun scheduleEditRoute(scheduleId: String): String =
     "schedule_edit/${Uri.encode(scheduleId)}"
 
@@ -209,7 +212,7 @@ private fun SalimNavGraph(
                 HomeScreen(onConnectClick = { navController.navigate(ROUTE_CONNECT) })
             }
             composable(SalimTab.Expense.route) {
-                ExpenseScreen(onItemClick = { navController.navigate(ROUTE_EXPENSE_INPUT) })
+                ExpenseScreen(onItemClick = { row -> navController.navigate(expenseEditRoute(row.id)) })
             }
             composable(SalimTab.Schedule.route) {
                 ScheduleScreen(
@@ -328,8 +331,19 @@ private fun SalimNavGraph(
             composable(ROUTE_EXPENSE_INPUT) {
                 ExpenseInputScreen(
                     onClose = { navController.popBackStack() },
-                    onSave = { navController.popBackStack() },
+                    onDone = { navController.popBackStack() },
                     onEditCategories = { navController.navigate(ROUTE_CATEGORY_EDIT) },
+                )
+            }
+            composable(
+                ROUTE_EXPENSE_EDIT,
+                arguments = listOf(navArgument("expenseId") { type = NavType.StringType }),
+            ) { entry ->
+                ExpenseInputScreen(
+                    onClose = { navController.popBackStack() },
+                    onDone = { navController.popBackStack() },
+                    onEditCategories = { navController.navigate(ROUTE_CATEGORY_EDIT) },
+                    expenseId = entry.arguments?.getString("expenseId"),
                 )
             }
             composable(ROUTE_CATEGORY_EDIT) {

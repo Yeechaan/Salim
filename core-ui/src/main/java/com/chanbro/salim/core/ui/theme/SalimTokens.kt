@@ -35,8 +35,24 @@ object SalimTokens {
     val Lavender = Color(0xFFB7AEE0)
     val Mint = Color(0xFF93C7B4)
 
-    // 카테고리 도넛 세그먼트 (design.md: 식비=Peach, 문화/여가=Lavender, 교통=Mint)
-    val CatFood = Peach       // 식비
-    val CatCulture = Lavender // 문화/여가
-    val CatTransport = Mint   // 교통
+    // 카테고리 팔레트 (design.md "카테고리 색"). 카테고리마다 한 색 — 고정 항목끼리는 계열이 겹치지 않는다.
+    // 파스텔 톤을 유지하되 위 파스텔 세트보다 한 단계 진하게 잡아, 옅은 배경(24%) 위에서도 카테고리끼리 갈리게 한다.
+    val CatPeach = Color(0xFFF09A7E)
+    val CatSage = Color(0xFF86BC96)
+    val CatRose = Color(0xFFE791B0)
+    val CatLavender = Color(0xFFA89FE0)
+    val CatSky = Color(0xFF7FB2E3)
+    val CatMint = Color(0xFF72BFB2)
+    val CatButter = Color(0xFFE6C274)
+    val CatLilac = Color(0xFFC99BDB)
+    val CatClay = Color(0xFFC79B7C)
+    val CatApricot = Color(0xFFF0B27A)
+    val CatWarmGray = Color(0xFFADA195)
+    val CatOlive = Color(0xFFB3C27A)
+
+    /** 카테고리 칩·아이콘 배지의 옅은 배경 농도. */
+    const val CategoryTintAlpha = 0.24f
+
+    /** 선택된 카테고리 칩의 배경 농도. 같은 카테고리색 테두리와 함께 쓴다. */
+    const val CategorySelectedAlpha = 0.40f
 }

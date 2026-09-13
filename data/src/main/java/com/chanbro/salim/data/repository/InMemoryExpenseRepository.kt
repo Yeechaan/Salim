@@ -27,8 +27,18 @@ class InMemoryExpenseRepository @Inject constructor() : ExpenseRepository {
                 .sortedByDescending { it.createdAtMillis }
         }
 
+    override suspend fun get(id: String): Expense? = expenses.value.firstOrNull { it.id == id }
+
     override suspend fun add(expense: Expense) {
         expenses.update { it + expense }
+    }
+
+    override suspend fun update(expense: Expense) {
+        expenses.update { list -> list.map { if (it.id == expense.id) expense else it } }
+    }
+
+    override suspend fun delete(id: String) {
+        expenses.update { list -> list.filterNot { it.id == id } }
     }
 
     private fun inMonth(utcMillis: Long, year: Int, month: Int): Boolean {

@@ -172,7 +172,7 @@ private fun ExpenseRow(row: ExpenseRowUi, onClick: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        CategoryIconBadge(row.iconKey)
+        CategoryIconBadge(row.iconKey, row.colorKey)
         Column(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(2.dp),

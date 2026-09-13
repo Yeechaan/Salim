@@ -32,7 +32,8 @@ import javax.inject.Inject
 // UI 표시용 모델 (도메인 → 화면 매핑 결과).
 data class CategorySpendUi(
     val name: String,
-    val iconKey: String,
+    /** 차트 조각·범례 점 색. 어느 화면에서나 카테고리마다 같은 색이다. */
+    val colorKey: String,
     val amount: String,
     val ratio: Float,
 )
@@ -128,7 +129,7 @@ class HomeViewModel @Inject constructor(
             .map { (label, amount) ->
                 CategorySpendUi(
                     name = label.name,
-                    iconKey = label.iconKey,
+                    colorKey = label.colorKey,
                     amount = formatWon(amount),
                     ratio = if (total > 0) amount.toFloat() / total else 0f,
                 )

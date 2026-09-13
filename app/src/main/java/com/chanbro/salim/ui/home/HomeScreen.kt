@@ -56,7 +56,7 @@ import com.chanbro.salim.ui.common.BudgetInputSheet
 import com.chanbro.salim.ui.common.SalimCard
 import com.chanbro.salim.ui.common.SalimTab
 import com.chanbro.salim.ui.common.SalimType
-import com.chanbro.salim.ui.common.categoryVisual
+import com.chanbro.salim.ui.common.categoryColor
 import com.chanbro.salim.ui.connect.ConnectViewModel
 import com.chanbro.salim.ui.dday.DDayListViewModel
 
@@ -305,7 +305,7 @@ private fun CategoryCard(categories: List<CategorySpendUi>) {
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Box(Modifier.size(10.dp).clip(CircleShape).background(categoryVisual(cat.iconKey).second))
+                                    Box(Modifier.size(10.dp).clip(CircleShape).background(categoryColor(cat.colorKey)))
                                     Text(cat.name, style = SalimType.bodyMd, color = SalimTokens.TextMuted)
                                 }
                                 Text(cat.amount, style = SalimType.bodyMd, color = SalimTokens.TextPrimary)
@@ -321,7 +321,7 @@ private fun CategoryCard(categories: List<CategorySpendUi>) {
 @Composable
 private fun DonutChart(categories: List<CategorySpendUi>) {
     Box(modifier = Modifier.size(120.dp), contentAlignment = Alignment.Center) {
-        val colors = categories.map { categoryVisual(it.iconKey).second }
+        val colors = categories.map { categoryColor(it.colorKey) }
         Canvas(modifier = Modifier.fillMaxSize()) {
             val strokeWidth = size.minDimension * 0.22f
             val diameter = size.minDimension - strokeWidth

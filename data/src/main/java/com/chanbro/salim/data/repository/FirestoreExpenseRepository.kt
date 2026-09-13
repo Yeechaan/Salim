@@ -57,22 +57,43 @@ class FirestoreExpenseRepository @Inject constructor(
             }
         }
 
+    override suspend fun get(id: String): Expense? {
+        val scope = userScope.requireScope()
+        val snapshot = collection(scope.doc).document(id).get().await()
+        return if (snapshot.exists()) snapshot.toExpense(scope.myUid) else null
+    }
+
     override suspend fun add(expense: Expense) {
         val scope = userScope.requireScope()
-        val data = mapOf(
-            "amount" to expense.amount,
-            "spentAtMillis" to expense.spentAtMillis,
-            // 지출자는 uid로 저장한다. "나/배우자"는 보는 사람에 따라 뒤집히는 값이라
-            // 공동 경로에 그대로 넣으면 상대가 반대로 읽는다. (firestore-schema.md)
-            "spenderId" to scope.spenderUid(expense.spender),
-            // 표시는 categoryId로 지금 이름을 찾는다. categoryName은 카테고리를 못 찾을 때의 대비용.
-            "categoryId" to expense.categoryId,
-            "categoryName" to expense.categoryName,
-            "memo" to expense.memo,
-            "createdAtMillis" to expense.createdAtMillis,
-        )
+        collection(scope.doc).document(expense.id).set(expense.toData(scope)).await()
+    }
+
+    /**
+     * 문서를 통째로 다시 쓴다 — 예전 문서의 `spender`(상대값) 같은 낡은 필드가 수정 후에 남지 않게.
+     * createdAtMillis는 호출부가 원래 값을 넘기므로 전체보기 정렬 위치가 바뀌지 않는다.
+     */
+    override suspend fun update(expense: Expense) {
+        val scope = userScope.requireScope()
+        val data = expense.toData(scope) + ("updatedAtMillis" to System.currentTimeMillis())
         collection(scope.doc).document(expense.id).set(data).await()
     }
+
+    override suspend fun delete(id: String) {
+        collection(userScope.requireScope().doc).document(id).delete().await()
+    }
+
+    private fun Expense.toData(scope: DataScope): Map<String, Any?> = mapOf(
+        "amount" to amount,
+        "spentAtMillis" to spentAtMillis,
+        // 지출자는 uid로 저장한다. "나/배우자"는 보는 사람에 따라 뒤집히는 값이라
+        // 공동 경로에 그대로 넣으면 상대가 반대로 읽는다. (firestore-schema.md)
+        "spenderId" to scope.spenderUid(spender),
+        // 표시는 categoryId로 지금 이름을 찾는다. categoryName은 카테고리를 못 찾을 때의 대비용.
+        "categoryId" to categoryId,
+        "categoryName" to categoryName,
+        "memo" to memo,
+        "createdAtMillis" to createdAtMillis,
+    )
 
     private fun collection(scopeDoc: DocumentReference): CollectionReference =
         scopeDoc.collection("expenses")

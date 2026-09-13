@@ -1,6 +1,7 @@
 package com.chanbro.salim.domain.usecase
 
 import com.chanbro.salim.domain.model.Category
+import com.chanbro.salim.domain.model.CategoryColors
 import com.chanbro.salim.domain.model.CategoryNameError
 import com.chanbro.salim.domain.model.DefaultCategories
 import com.chanbro.salim.domain.repository.CategoryRepository
@@ -26,6 +27,40 @@ class CategoryUseCasesTest {
         assertFalse(added.fixed)
         assertEquals(Category.CUSTOM_ICON, added.iconKey)
         assertEquals(DefaultCategories.all.maxOf { it.order } + 1, added.order)
+    }
+
+    @Test
+    fun `추가한 항목은 아직 아무도 안 쓰는 색을 받는다`() = runBlocking {
+        AddCategoryUseCase(repository)("반려동물")
+
+        // 기본 11개가 쓰지 않는 팔레트의 마지막 색
+        assertEquals("olive", repository.current.single { it.name == "반려동물" }.colorKey)
+    }
+
+    @Test
+    fun `팔레트가 다 차면 가장 덜 쓰인 색을 받는다`() = runBlocking {
+        val add = AddCategoryUseCase(repository)
+        add("반려동물") // olive
+        add("육아")     // 모든 색이 1번씩 쓰였으니 팔레트 첫 색
+
+        assertEquals("peach", repository.current.single { it.name == "육아" }.colorKey)
+    }
+
+    @Test
+    fun `같은 색 계열 항목을 고정으로 올리면 그 항목 색만 다른 계열로 바꾼다`() = runBlocking {
+        // 의료/건강(lilac)은 고정 항목 문화(lavender)와 같은 보라 계열
+        SwapFixedCategoryUseCase(repository)(fixedId = "cafe", moreId = "health")
+
+        val fixedFamilies = repository.current.filter { it.fixed }.map { CategoryColors.familyOf(it.colorKey) }
+        assertEquals(DefaultCategories.FIXED_COUNT, fixedFamilies.toSet().size)
+        assertEquals("lavender", repository.current.single { it.id == "culture" }.colorKey)
+    }
+
+    @Test
+    fun `계열이 겹치지 않으면 고정으로 올려도 색은 그대로다`() = runBlocking {
+        SwapFixedCategoryUseCase(repository)(fixedId = "cafe", moreId = "transport")
+
+        assertEquals("mint", repository.current.single { it.id == "transport" }.colorKey)
     }
 
     @Test
