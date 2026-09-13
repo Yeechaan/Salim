@@ -65,6 +65,8 @@ class FirestoreExpenseRepository @Inject constructor(
             // 지출자는 uid로 저장한다. "나/배우자"는 보는 사람에 따라 뒤집히는 값이라
             // 공동 경로에 그대로 넣으면 상대가 반대로 읽는다. (firestore-schema.md)
             "spenderId" to scope.spenderUid(expense.spender),
+            // 표시는 categoryId로 지금 이름을 찾는다. categoryName은 카테고리를 못 찾을 때의 대비용.
+            "categoryId" to expense.categoryId,
             "categoryName" to expense.categoryName,
             "memo" to expense.memo,
             "createdAtMillis" to expense.createdAtMillis,
@@ -83,6 +85,7 @@ class FirestoreExpenseRepository @Inject constructor(
         categoryName = getString("categoryName") ?: "기타",
         memo = getString("memo"),
         createdAtMillis = getLong("createdAtMillis") ?: 0L,
+        categoryId = getString("categoryId"),
     )
 
     /**

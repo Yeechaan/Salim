@@ -2,11 +2,14 @@ package com.chanbro.salim.ui.expense
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.chanbro.salim.domain.model.Category
 import com.chanbro.salim.domain.model.Connection
+import com.chanbro.salim.domain.model.DefaultCategories
 import com.chanbro.salim.domain.model.Expense
 import com.chanbro.salim.domain.model.Spender
 import com.chanbro.salim.domain.model.SpenderNames
 import com.chanbro.salim.domain.usecase.AddExpenseUseCase
+import com.chanbro.salim.domain.usecase.ObserveCategoriesUseCase
 import com.chanbro.salim.domain.usecase.ObserveConnectionUseCase
 import com.chanbro.salim.domain.usecase.ObserveSpenderNamesUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -23,20 +26,34 @@ data class ExpenseInputUiState(
     val connected: Boolean = false,
     /** 지출자 칩에 쓸 이름. 프로필을 비워 두면 "나"/"배우자"로 떨어진다. */
     val names: SpenderNames = SpenderNames(),
-)
+    /** 설정 > 카테고리 수정에서 정한 목록. 불러오기 전에도 칩이 비지 않게 기본 목록으로 시작한다. */
+    val categories: List<Category> = DefaultCategories.all,
+) {
+    /** 칩으로 바로 고르는 항목. (PRD 4) */
+    val fixedCategories: List<Category> get() = categories.filter { it.fixed }
+
+    /** "+더보기" 시트에 나오는 항목. */
+    val moreCategories: List<Category> get() = categories.filterNot { it.fixed }
+}
 
 @HiltViewModel
 class ExpenseInputViewModel @Inject constructor(
     private val addExpense: AddExpenseUseCase,
     observeConnection: ObserveConnectionUseCase,
     observeSpenderNames: ObserveSpenderNamesUseCase,
+    observeCategories: ObserveCategoriesUseCase,
 ) : ViewModel() {
 
     val uiState: StateFlow<ExpenseInputUiState> = combine(
         observeConnection(),
         observeSpenderNames(),
-    ) { connection, names ->
-        ExpenseInputUiState(connected = connection is Connection.Connected, names = names)
+        observeCategories(),
+    ) { connection, names, categories ->
+        ExpenseInputUiState(
+            connected = connection is Connection.Connected,
+            names = names,
+            categories = categories,
+        )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -52,7 +69,7 @@ class ExpenseInputViewModel @Inject constructor(
     fun save(
         amount: Long,
         spender: Spender,
-        categoryName: String,
+        category: Category,
         memo: String,
         dateUtcMillis: Long,
         hour24: Int,
@@ -65,9 +82,10 @@ class ExpenseInputViewModel @Inject constructor(
             amount = amount,
             spentAtMillis = spentAt,
             spender = spender,
-            categoryName = categoryName,
+            categoryName = category.name,
             memo = memo.trim().ifBlank { null },
             createdAtMillis = System.currentTimeMillis(),
+            categoryId = category.id,
         )
         viewModelScope.launch {
             addExpense(expense)

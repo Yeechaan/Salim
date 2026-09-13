@@ -19,6 +19,9 @@ import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.DirectionsBus
 import androidx.compose.material.icons.filled.CardGiftcard
+import androidx.compose.material.icons.filled.CleaningServices
+import androidx.compose.material.icons.filled.Flight
+import androidx.compose.material.icons.filled.LocalHospital
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Home
@@ -56,6 +59,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -63,6 +68,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -287,20 +293,34 @@ fun SalimChip(
     // 한 줄에 칩을 여러 개 균등 폭으로 깔 때(예산 빠른 금액 5개) 좁은 패딩/작은 글자로 줄여 쓸 수 있다.
     horizontalPadding: Dp = 18.dp,
     textStyle: TextStyle = SalimType.bodyMd,
+    // 카테고리 칩처럼 모양으로 먼저 알아보게 할 때. 색은 글자와 같이 따라가서 칩 톤을 깨지 않는다.
+    leadingIcon: ImageVector? = null,
 ) {
-    Box(
+    val contentColor = if (selected) Color.White else SalimTokens.Accent
+    Row(
         modifier = modifier
             .clip(RoundedCornerShape(percent = 50))
             .background(if (selected) SalimTokens.Accent else SalimTokens.AccentSoft)
             .clickable(onClick = onClick)
-            .padding(horizontal = horizontalPadding, vertical = 10.dp),
-        contentAlignment = Alignment.Center,
+            // 아이콘이 있으면 왼쪽 여백을 줄여 좌우가 시각적으로 같은 무게가 되게 한다.
+            .padding(
+                start = if (leadingIcon != null) horizontalPadding - 4.dp else horizontalPadding,
+                end = horizontalPadding,
+                top = 10.dp,
+                bottom = 10.dp,
+            ),
+        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (leadingIcon != null) {
+            Icon(leadingIcon, contentDescription = null, tint = contentColor, modifier = Modifier.size(18.dp))
+        }
         Text(
             label,
             style = textStyle.copy(fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium),
-            color = if (selected) Color.White else SalimTokens.Accent,
+            color = contentColor,
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -404,6 +424,11 @@ fun DatePickerModal(
     }
 }
 
+/** 기기 시간대 기준 이번 달 (연, 월 1~12). 월 단위 화면(홈·가계부·일정·설정 예산)의 시작 달. */
+fun currentYearMonth(): Pair<Int, Int> = Calendar.getInstance().let {
+    it.get(Calendar.YEAR) to it.get(Calendar.MONTH) + 1
+}
+
 /** UTC 자정 기준(Material3 DatePicker 규약)으로 오늘 날짜의 millis. */
 fun todayUtcMillis(): Long {
     val local = Calendar.getInstance()
@@ -447,17 +472,82 @@ fun TimePickerModal(
 }
 
 // ---------------------------------------------------------------------------
-// 카테고리 → 아이콘/색 (표시 전용 매핑) — 가계부 리스트, 홈 카테고리 차트 공용
-// TODO: 설정 > 카테고리 수정(PRD 7)이 생기면 categories 문서의 icon 키로 대체
+// 카테고리 아이콘 키 → 아이콘/색 (표시 전용 매핑) — 가계부 리스트, 홈 카테고리 차트, 카테고리 수정 공용
+// 키는 categories 문서의 icon 필드(domain DefaultCategories). 이름을 바꿔도 모양은 유지된다.
 // ---------------------------------------------------------------------------
 
-fun categoryVisual(name: String): Pair<ImageVector, Color> = when (name) {
-    "식비" -> Icons.Filled.Restaurant to SalimTokens.CatFood
-    "카페" -> Icons.Filled.LocalCafe to SalimTokens.Sage
-    "교통" -> Icons.Filled.DirectionsBus to SalimTokens.CatTransport
-    "문화/여가" -> Icons.Filled.Movie to SalimTokens.CatCulture
-    "생활" -> Icons.Filled.ShoppingBag to SalimTokens.Accent
+fun categoryVisual(iconKey: String): Pair<ImageVector, Color> = when (iconKey) {
+    "food" -> Icons.Filled.Restaurant to SalimTokens.CatFood
+    "cafe" -> Icons.Filled.LocalCafe to SalimTokens.Sage
+    "shopping" -> Icons.Filled.ShoppingBag to SalimTokens.Accent
+    "culture" -> Icons.Filled.Movie to SalimTokens.CatCulture
+    "travel" -> Icons.Filled.Flight to SalimTokens.Mint
+    "transport" -> Icons.Filled.DirectionsBus to SalimTokens.CatTransport
+    "living" -> Icons.Filled.CleaningServices to SalimTokens.Accent
+    "health" -> Icons.Filled.LocalHospital to SalimTokens.Peach
+    "housing" -> Icons.Filled.Home to SalimTokens.Sage
+    "gift" -> Icons.Filled.CardGiftcard to SalimTokens.Lavender
+    // "etc"와 사용자가 추가한 항목("custom")
     else -> Icons.Filled.Receipt to SalimTokens.Lavender
+}
+
+/** 카테고리 아이콘을 옅은 같은 색 배경 위에 올린 배지. 가계부 리스트와 카테고리 수정 목록에서 쓴다. */
+@Composable
+fun CategoryIconBadge(iconKey: String, modifier: Modifier = Modifier, size: Dp = 42.dp) {
+    val (icon, color) = categoryVisual(iconKey)
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(RoundedCornerShape(size * 0.31f))
+            .background(color.copy(alpha = 0.16f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(size * 0.52f))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 칩 줄바꿈 배치 — 카테고리 이름 길이가 제각각이라 개수 기준(3개씩)으로 자르면 넘친다.
+// (foundation FlowRow는 compose-foundation 버전 스큐 이슈가 있어 직접 배치한다)
+// ---------------------------------------------------------------------------
+
+@Composable
+fun ChipFlowRow(
+    modifier: Modifier = Modifier,
+    spacing: Dp = 10.dp,
+    content: @Composable () -> Unit,
+) {
+    Layout(content = content, modifier = modifier) { measurables, constraints ->
+        val gap = spacing.roundToPx()
+        val childConstraints = constraints.copy(minWidth = 0, minHeight = 0)
+        val placeables = measurables.map { it.measure(childConstraints) }
+
+        val rows = mutableListOf<MutableList<Placeable>>()
+        var rowWidth = 0
+        placeables.forEach { p ->
+            val needed = if (rows.isEmpty() || rows.last().isEmpty()) p.width else rowWidth + gap + p.width
+            if (rows.isEmpty() || needed > constraints.maxWidth) {
+                rows += mutableListOf(p)
+                rowWidth = p.width
+            } else {
+                rows.last() += p
+                rowWidth = needed
+            }
+        }
+
+        val height = rows.sumOf { row -> row.maxOf { it.height } } + gap * (rows.size - 1).coerceAtLeast(0)
+        layout(constraints.maxWidth, height.coerceAtLeast(constraints.minHeight)) {
+            var y = 0
+            rows.forEach { row ->
+                var x = 0
+                row.forEach { p ->
+                    p.placeRelative(x, y)
+                    x += p.width + gap
+                }
+                y += row.maxOf { it.height } + gap
+            }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -508,3 +598,9 @@ fun formatThousands(digits: String): String {
     if (n.isEmpty()) return ""
     return n.reversed().chunked(3).joinToString(",").reversed()
 }
+
+/**
+ * 표시용 금액 "12,000원". 0이면 "0원".
+ * [formatThousands]는 입력칸 placeholder 때문에 0을 ""로 돌려주므로, 금액 표시는 이 함수를 쓴다.
+ */
+fun formatWon(amount: Long): String = "${formatThousands(amount.toString()).ifEmpty { "0" }}원"

@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.chanbro.salim.domain.model.Schedule
 import com.chanbro.salim.domain.model.ScheduleType
 import com.chanbro.salim.domain.usecase.ObserveMonthSchedulesUseCase
+import com.chanbro.salim.ui.common.currentYearMonth
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -137,10 +138,6 @@ class ScheduleViewModel @Inject constructor(
         meta = "${minuteOfDay?.let(::formatMinuteOfDay) ?: "종일"} · ${type.label}",
         type = type,
     )
-
-    private fun currentYearMonth(): Pair<Int, Int> = Calendar.getInstance().let {
-        it.get(Calendar.YEAR) to it.get(Calendar.MONTH) + 1
-    }
 }
 
 /** 0~1439 → "오후 2:00". */

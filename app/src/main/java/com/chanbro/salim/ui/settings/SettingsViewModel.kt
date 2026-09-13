@@ -9,14 +9,14 @@ import com.chanbro.salim.domain.usecase.ObserveConnectionUseCase
 import com.chanbro.salim.domain.usecase.ObserveProfileUseCase
 import com.chanbro.salim.domain.usecase.SaveBudgetUseCase
 import com.chanbro.salim.domain.usecase.SignOutUseCase
-import com.chanbro.salim.ui.common.formatThousands
+import com.chanbro.salim.ui.common.currentYearMonth
+import com.chanbro.salim.ui.common.formatWon
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.util.Calendar
 import javax.inject.Inject
 
 data class SettingsUiState(
@@ -28,7 +28,7 @@ data class SettingsUiState(
 ) {
     /** 목록 우측에 노출할 현재 예산값. 미설정이면 안내 문구. (wireframe/settings.md 3.) */
     val budgetText: String
-        get() = budgetAmount?.let { "${formatThousands(it.toString())}원" } ?: "미설정"
+        get() = budgetAmount?.let(::formatWon) ?: "미설정"
 
     /** 프로필 줄 우측 값. 이름을 정했으면 그 이름이 가장 알아보기 쉽다. */
     val profileText: String
@@ -77,8 +77,4 @@ class SettingsViewModel @Inject constructor(
     fun onSignOut() {
         viewModelScope.launch { signOut() }
     }
-}
-
-private fun currentYearMonth(): Pair<Int, Int> = Calendar.getInstance().let {
-    it.get(Calendar.YEAR) to it.get(Calendar.MONTH) + 1
 }

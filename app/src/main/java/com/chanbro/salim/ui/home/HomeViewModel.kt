@@ -3,13 +3,17 @@ package com.chanbro.salim.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.chanbro.salim.domain.model.Budget
+import com.chanbro.salim.domain.model.Category
 import com.chanbro.salim.domain.model.Expense
 import com.chanbro.salim.domain.model.SpenderNames
+import com.chanbro.salim.domain.model.labelOf
 import com.chanbro.salim.domain.usecase.ObserveBudgetUseCase
+import com.chanbro.salim.domain.usecase.ObserveCategoriesUseCase
 import com.chanbro.salim.domain.usecase.ObserveMonthExpensesUseCase
 import com.chanbro.salim.domain.usecase.ObserveSpenderNamesUseCase
 import com.chanbro.salim.domain.usecase.SaveBudgetUseCase
-import com.chanbro.salim.ui.common.formatThousands
+import com.chanbro.salim.ui.common.currentYearMonth
+import com.chanbro.salim.ui.common.formatWon
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,7 +24,6 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
-import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
@@ -29,6 +32,7 @@ import javax.inject.Inject
 // UI 표시용 모델 (도메인 → 화면 매핑 결과).
 data class CategorySpendUi(
     val name: String,
+    val iconKey: String,
     val amount: String,
     val ratio: Float,
 )
@@ -47,8 +51,8 @@ data class HomeUiState(
     val categories: List<CategorySpendUi> = emptyList(),
     val recent: List<TransactionUi> = emptyList(),
 ) {
-    val spentText: String get() = "${formatThousands(monthSpent.toString()).ifEmpty { "0" }}원"
-    val budgetText: String? get() = budgetAmount?.let { "${formatThousands(it.toString())}원" }
+    val spentText: String get() = formatWon(monthSpent)
+    val budgetText: String? get() = budgetAmount?.let(::formatWon)
 
     /** 예산 대비 사용 비율. 미설정이면 null, 초과하면 1f로 잘라 진행바에 사용. */
     val usedRatio: Float?
@@ -61,8 +65,8 @@ data class HomeUiState(
     val remainText: String?
         get() = budgetAmount?.let {
             val remain = it - monthSpent
-            if (remain >= 0) "남은 예산 ${formatThousands(remain.toString()).ifEmpty { "0" }}원"
-            else "예산 ${formatThousands((-remain).toString())}원 초과"
+            if (remain >= 0) "남은 예산 ${formatWon(remain)}"
+            else "예산 ${formatWon(-remain)} 초과"
         }
 }
 
@@ -71,6 +75,7 @@ class HomeViewModel @Inject constructor(
     observeMonthExpenses: ObserveMonthExpensesUseCase,
     observeBudget: ObserveBudgetUseCase,
     observeSpenderNames: ObserveSpenderNamesUseCase,
+    observeCategories: ObserveCategoriesUseCase,
     private val saveBudget: SaveBudgetUseCase,
 ) : ViewModel() {
 
@@ -83,8 +88,9 @@ class HomeViewModel @Inject constructor(
                 observeMonthExpenses(year, month),
                 observeBudget(year, month),
                 observeSpenderNames(),
-            ) { expenses, budget, names ->
-                toUiState(year, month, expenses, budget, names)
+                observeCategories(),
+            ) { expenses, budget, names, categories ->
+                toUiState(year, month, expenses, budget, names, categories)
             }
         }
         .stateIn(
@@ -110,23 +116,27 @@ class HomeViewModel @Inject constructor(
         expenses: List<Expense>,
         budget: Budget?,
         names: SpenderNames,
+        categoryList: List<Category>,
     ): HomeUiState {
         val total = expenses.sumOf { it.amount }
+        // 지금 이름으로 묶는다 — id가 있는 지출과, 같은 이름으로 저장된 예전 지출이 한 항목으로 합쳐진다.
         val categories = expenses
-            .groupBy { it.categoryName }
-            .map { (name, items) -> name to items.sumOf { it.amount } }
+            .map { categoryList.labelOf(it) to it.amount }
+            .groupBy { (label, _) -> label.name }
+            .map { (_, items) -> items.first().first to items.sumOf { it.second } }
             .sortedByDescending { it.second }
-            .map { (name, amount) ->
+            .map { (label, amount) ->
                 CategorySpendUi(
-                    name = name,
-                    amount = "${formatThousands(amount.toString()).ifEmpty { "0" }}원",
+                    name = label.name,
+                    iconKey = label.iconKey,
+                    amount = formatWon(amount),
                     ratio = if (total > 0) amount.toFloat() / total else 0f,
                 )
             }
         val recent = expenses
             .sortedByDescending { it.createdAtMillis }
             .take(3)
-            .map { it.toTransactionUi(names) }
+            .map { it.toTransactionUi(names, categoryList.labelOf(it).name) }
 
         return HomeUiState(
             year = year,
@@ -138,18 +148,14 @@ class HomeViewModel @Inject constructor(
         )
     }
 
-    private fun Expense.toTransactionUi(names: SpenderNames) = TransactionUi(
+    private fun Expense.toTransactionUi(names: SpenderNames, categoryName: String) = TransactionUi(
         title = memo?.takeIf { it.isNotBlank() } ?: categoryName,
         meta = "$categoryName · ${names.labelOf(spender)} · ${formatShortDate(spentAtMillis)}",
-        amount = "-${formatThousands(amount.toString()).ifEmpty { "0" }}원",
+        amount = "-${formatWon(amount)}",
     )
 
     private fun formatShortDate(utcMillis: Long): String =
         SimpleDateFormat("M/d", Locale.KOREAN).apply {
             timeZone = TimeZone.getTimeZone("UTC")
         }.format(Date(utcMillis))
-
-    private fun currentYearMonth(): Pair<Int, Int> = Calendar.getInstance().let {
-        it.get(Calendar.YEAR) to it.get(Calendar.MONTH) + 1
-    }
 }

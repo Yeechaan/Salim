@@ -53,6 +53,7 @@ import com.chanbro.salim.ui.expense.ExpenseScreen
 import com.chanbro.salim.ui.auth.LoginScreen
 import com.chanbro.salim.ui.home.HomeScreen
 import com.chanbro.salim.ui.onboarding.OnboardingScreen
+import com.chanbro.salim.ui.settings.CategoryEditScreen
 import com.chanbro.salim.ui.settings.ProfileEditScreen
 import com.chanbro.salim.ui.settings.SettingsScreen
 import com.chanbro.salim.ui.schedule.ScheduleInputScreen
@@ -67,6 +68,7 @@ private const val ROUTE_DDAY_EDIT = "dday_edit/{ddayId}"
 private const val ROUTE_SCHEDULE_INPUT = "schedule_input/{dateMillis}"
 private const val ROUTE_SCHEDULE_EDIT = "schedule_edit/{scheduleId}"
 private const val ROUTE_PROFILE_EDIT = "profile_edit"
+private const val ROUTE_CATEGORY_EDIT = "category_edit"
 
 // 상대방 연결 (wireframe/connect.md 9-1~9-5)
 private const val ROUTE_CONNECT = "connect"
@@ -227,6 +229,7 @@ private fun SalimNavGraph(
             composable(SalimTab.Settings.route) {
                 SettingsScreen(
                     onProfileClick = { navController.navigate(ROUTE_PROFILE_EDIT) },
+                    onCategoryClick = { navController.navigate(ROUTE_CATEGORY_EDIT) },
                     onConnectClick = { navController.navigate(ROUTE_CONNECT) },
                 )
             }
@@ -326,7 +329,11 @@ private fun SalimNavGraph(
                 ExpenseInputScreen(
                     onClose = { navController.popBackStack() },
                     onSave = { navController.popBackStack() },
+                    onEditCategories = { navController.navigate(ROUTE_CATEGORY_EDIT) },
                 )
+            }
+            composable(ROUTE_CATEGORY_EDIT) {
+                CategoryEditScreen(onClose = { navController.popBackStack() })
             }
         }
     }

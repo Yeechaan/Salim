@@ -59,6 +59,7 @@ import java.util.Locale
 fun SettingsScreen(
     modifier: Modifier = Modifier,
     onProfileClick: () -> Unit = {},
+    onCategoryClick: () -> Unit = {},
     onConnectClick: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
@@ -70,6 +71,7 @@ fun SettingsScreen(
         state = state,
         modifier = modifier,
         onProfileClick = onProfileClick,
+        onCategoryClick = onCategoryClick,
         onConnectClick = onConnectClick,
         onBudgetClick = { showBudgetSheet = true },
         onSignOutClick = { confirmingSignOut = true },
@@ -104,6 +106,7 @@ private fun SettingsContent(
     state: SettingsUiState,
     modifier: Modifier = Modifier,
     onProfileClick: () -> Unit,
+    onCategoryClick: () -> Unit,
     onConnectClick: () -> Unit,
     onBudgetClick: () -> Unit,
     onSignOutClick: () -> Unit,
@@ -128,8 +131,8 @@ private fun SettingsContent(
                 RowDivider()
                 SettingsRow(
                     label = "가계부 카테고리 수정",
-                    value = "준비 중",
-                    enabled = false,
+                    value = "",
+                    onClick = onCategoryClick,
                 )
                 RowDivider()
                 SettingsRow(
@@ -349,6 +352,7 @@ private fun SettingsScreenPreview() {
             state = SettingsUiState(year = 2026, month = 8, budgetAmount = 1_200_000),
             modifier = Modifier.background(SalimTokens.Background),
             onProfileClick = {},
+            onCategoryClick = {},
             onConnectClick = {},
             onBudgetClick = {},
             onSignOutClick = {},
