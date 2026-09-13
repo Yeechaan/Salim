@@ -2,11 +2,16 @@ package com.chanbro.salim.ui.expense
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.chanbro.salim.domain.model.Category
+import com.chanbro.salim.domain.model.CategoryLabel
 import com.chanbro.salim.domain.model.Expense
 import com.chanbro.salim.domain.model.SpenderNames
+import com.chanbro.salim.domain.model.labelOf
+import com.chanbro.salim.domain.usecase.ObserveCategoriesUseCase
 import com.chanbro.salim.domain.usecase.ObserveMonthExpensesUseCase
 import com.chanbro.salim.domain.usecase.ObserveSpenderNamesUseCase
-import com.chanbro.salim.ui.common.formatThousands
+import com.chanbro.salim.ui.common.currentYearMonth
+import com.chanbro.salim.ui.common.formatWon
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,9 +28,9 @@ import java.util.Locale
 import java.util.TimeZone
 import javax.inject.Inject
 
-// UI 표시용 모델 (도메인 → 화면 매핑 결과). 아이콘/색은 화면에서 categoryName으로 결정.
+// UI 표시용 모델 (도메인 → 화면 매핑 결과). 아이콘/색은 화면에서 iconKey로 결정.
 data class ExpenseRowUi(
-    val categoryName: String,
+    val iconKey: String,
     val title: String,
     val meta: String,
     val amount: String,
@@ -37,8 +42,8 @@ data class ExpenseDayUi(
 )
 
 data class ExpenseListUiState(
-    val year: Int = 2026,
-    val month: Int = 8,
+    val year: Int = 0,
+    val month: Int = 0,
     val monthTotal: String = "0원",
     val days: List<ExpenseDayUi> = emptyList(),
 )
@@ -47,9 +52,10 @@ data class ExpenseListUiState(
 class ExpenseListViewModel @Inject constructor(
     observeMonth: ObserveMonthExpensesUseCase,
     observeSpenderNames: ObserveSpenderNamesUseCase,
+    observeCategories: ObserveCategoriesUseCase,
 ) : ViewModel() {
 
-    private val yearMonth = MutableStateFlow(2026 to 8)
+    private val yearMonth = MutableStateFlow(currentYearMonth())
 
     /** 달을 결과와 함께 들고 다닌다 — 따로 combine하면 달이 먼저 바뀌어 헤더와 목록이 어긋난다. */
     private data class MonthExpenses(val year: Int, val month: Int, val expenses: List<Expense>)
@@ -61,13 +67,14 @@ class ExpenseListViewModel @Inject constructor(
         }
 
     val uiState: StateFlow<ExpenseListUiState> =
-        combine(monthExpenses, observeSpenderNames()) { month, names ->
-            toUiState(month.year, month.month, month.expenses, names)
+        combine(monthExpenses, observeSpenderNames(), observeCategories()) { month, names, categories ->
+            toUiState(month.year, month.month, month.expenses, names, categories)
         }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = ExpenseListUiState(),
+            // 첫 스냅샷 전에도 헤더가 이번 달로 보이게 한다.
+            initialValue = currentYearMonth().let { (y, m) -> ExpenseListUiState(year = y, month = m) },
         )
 
     fun setMonth(year: Int, month: Int) {
@@ -79,6 +86,7 @@ class ExpenseListViewModel @Inject constructor(
         month: Int,
         expenses: List<Expense>,
         names: SpenderNames,
+        categories: List<Category>,
     ): ExpenseListUiState {
         val total = expenses.sumOf { it.amount }
         val days = expenses
@@ -88,22 +96,22 @@ class ExpenseListViewModel @Inject constructor(
             .map { (dayMillis, items) ->
                 ExpenseDayUi(
                     dateHeader = formatDayHeader(dayMillis),
-                    rows = items.map { it.toRowUi(names) },
+                    rows = items.map { it.toRowUi(names, categories.labelOf(it)) },
                 )
             }
         return ExpenseListUiState(
             year = year,
             month = month,
-            monthTotal = "${formatThousands(total.toString())}원",
+            monthTotal = formatWon(total),
             days = days,
         )
     }
 
-    private fun Expense.toRowUi(names: SpenderNames) = ExpenseRowUi(
-        categoryName = categoryName,
-        title = memo?.takeIf { it.isNotBlank() } ?: categoryName,
-        meta = "$categoryName · ${names.labelOf(spender)}",
-        amount = "-${formatThousands(amount.toString())}원",
+    private fun Expense.toRowUi(names: SpenderNames, category: CategoryLabel) = ExpenseRowUi(
+        iconKey = category.iconKey,
+        title = memo?.takeIf { it.isNotBlank() } ?: category.name,
+        meta = "${category.name} · ${names.labelOf(spender)}",
+        amount = "-${formatWon(amount)}",
     )
 
     private fun dayStartUtc(utcMillis: Long): Long =

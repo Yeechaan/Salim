@@ -48,7 +48,7 @@ import com.chanbro.salim.ui.common.MonthPickerSheet
 import com.chanbro.salim.ui.common.MonthSelector
 import com.chanbro.salim.ui.common.SalimCard
 import com.chanbro.salim.ui.common.SalimType
-import com.chanbro.salim.ui.common.categoryVisual
+import com.chanbro.salim.ui.common.CategoryIconBadge
 
 // ---------------------------------------------------------------------------
 // 화면 (하단 탭바/FAB는 상위 Scaffold가 제공, 여기서는 콘텐츠만)
@@ -163,7 +163,6 @@ private fun DayGroup(day: ExpenseDayUi, onItemClick: (ExpenseRowUi) -> Unit) {
 
 @Composable
 private fun ExpenseRow(row: ExpenseRowUi, onClick: () -> Unit) {
-    val (icon, color) = categoryVisual(row.categoryName)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -173,15 +172,7 @@ private fun ExpenseRow(row: ExpenseRowUi, onClick: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier = Modifier
-                .size(42.dp)
-                .clip(RoundedCornerShape(13.dp))
-                .background(color.copy(alpha = 0.16f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(22.dp))
-        }
+        CategoryIconBadge(row.iconKey)
         Column(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(2.dp),

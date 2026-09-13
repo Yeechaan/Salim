@@ -17,9 +17,13 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -30,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -37,10 +42,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.chanbro.salim.R
 import com.chanbro.salim.core.ui.theme.SalimTheme
 import com.chanbro.salim.core.ui.theme.SalimTokens
+import com.chanbro.salim.domain.model.Category
 import com.chanbro.salim.domain.model.Spender
 import com.chanbro.salim.domain.model.SpenderNames
+import com.chanbro.salim.ui.common.ChipFlowRow
+import com.chanbro.salim.ui.common.categoryVisual
 import com.chanbro.salim.ui.common.DatePickerModal
 import com.chanbro.salim.ui.common.FieldDivider
 import com.chanbro.salim.ui.common.FieldRow
@@ -54,8 +63,6 @@ import com.chanbro.salim.ui.common.ThousandsTransformation
 import com.chanbro.salim.ui.common.todayUtcMillis
 import java.util.Calendar
 
-private val quickCategories = listOf("식비", "카페", "교통", "문화/여가", "생활")
-
 // ---------------------------------------------------------------------------
 // 지출 입력 (expense.md 4-2) — 전체 화면 목적지
 // ---------------------------------------------------------------------------
@@ -64,6 +71,7 @@ private val quickCategories = listOf("식비", "카페", "교통", "문화/여�
 fun ExpenseInputScreen(
     onClose: () -> Unit,
     onSave: () -> Unit,
+    onEditCategories: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ExpenseInputViewModel = hiltViewModel(),
 ) {
@@ -71,13 +79,18 @@ fun ExpenseInputScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var amountDigits by rememberSaveable { mutableStateOf("") }
     var spender by rememberSaveable { mutableStateOf(Spender.ME) }
-    var category by rememberSaveable { mutableStateOf(quickCategories.first()) }
+    // 선택은 id로 들고 있는다 — 카테고리 수정에서 이름이나 고정/더보기 자리가 바뀌어도 선택이 유지된다.
+    var categoryId by rememberSaveable { mutableStateOf<String?>(null) }
+    val category = state.categories.firstOrNull { it.id == categoryId }
+        ?: state.fixedCategories.firstOrNull()
+        ?: state.categories.first()
     var memo by rememberSaveable { mutableStateOf("") }
     var dateMillis by rememberSaveable { mutableLongStateOf(todayUtcMillis()) }
     var hour by rememberSaveable { mutableIntStateOf(nowHour()) }
     var minute by rememberSaveable { mutableIntStateOf(nowMinute()) }
     var showDatePicker by rememberSaveable { mutableStateOf(false) }
     var showTimePicker by rememberSaveable { mutableStateOf(false) }
+    var showCategoryMore by rememberSaveable { mutableStateOf(false) }
 
     val canSave = amountDigits.isNotEmpty()
 
@@ -115,8 +128,10 @@ fun ExpenseInputScreen(
                     FieldDivider()
                 }
                 CategoryField(
+                    fixedCategories = state.fixedCategories,
                     selected = category,
-                    onSelect = { category = it },
+                    onSelect = { categoryId = it.id },
+                    onMoreClick = { showCategoryMore = true },
                 )
                 FieldDivider()
                 MemoField(memo = memo, onMemoChange = { memo = it })
@@ -130,7 +145,7 @@ fun ExpenseInputScreen(
                     amount = amountDigits.toLongOrNull() ?: 0L,
                     // 칩을 숨긴 상태에서 이전 선택이 남아 있어도 본인으로 저장한다.
                     spender = if (state.connected) spender else Spender.ME,
-                    categoryName = category,
+                    category = category,
                     memo = memo,
                     dateUtcMillis = dateMillis,
                     hour24 = hour,
@@ -154,6 +169,15 @@ fun ExpenseInputScreen(
             initialMinute = minute,
             onConfirm = { h, m -> hour = h; minute = m; showTimePicker = false },
             onDismiss = { showTimePicker = false },
+        )
+    }
+    if (showCategoryMore) {
+        CategoryMoreSheet(
+            moreCategories = state.moreCategories,
+            selected = category,
+            onDismiss = { showCategoryMore = false },
+            onSelect = { categoryId = it.id; showCategoryMore = false },
+            onEdit = { showCategoryMore = false; onEditCategories() },
         )
     }
 }
@@ -233,25 +257,98 @@ private fun SpenderField(
     }
 }
 
+/**
+ * 고정 칩 + "+더보기". 더보기에서 고른 항목은 "+더보기" 칩 자리에 "교통 ▾"처럼 선택 상태로 보여준다
+ * — 칩 줄 수가 그대로고, 누르면 시트가 다시 열린다는 것도 ▾로 읽힌다. (expense.md 4-2)
+ */
 @Composable
-private fun CategoryField(selected: String, onSelect: (String) -> Unit) {
-    val moreLabel = "+더보기"
-    val chips = quickCategories + moreLabel
+private fun CategoryField(
+    fixedCategories: List<Category>,
+    selected: Category,
+    onSelect: (Category) -> Unit,
+    onMoreClick: () -> Unit,
+) {
+    val moreSelected = !selected.fixed
     Column(
         modifier = Modifier.padding(vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("카테고리", style = SalimType.bodyMd, color = SalimTokens.TextMuted)
-        // FlowRow는 compose-foundation 버전 스큐 이슈가 있어 수동 래핑(3개씩)으로 처리.
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            chips.chunked(3).forEach { rowChips ->
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    rowChips.forEach { cat ->
-                        val isMore = cat == moreLabel
+        Text(stringResource(R.string.expense_category), style = SalimType.bodyMd, color = SalimTokens.TextMuted)
+        // 이름 길이가 제각각이라 개수가 아니라 폭으로 줄을 바꾼다.
+        ChipFlowRow {
+            fixedCategories.forEach { cat ->
+                SalimChip(
+                    label = cat.name,
+                    selected = cat.id == selected.id,
+                    onClick = { onSelect(cat) },
+                    leadingIcon = categoryVisual(cat.iconKey).first,
+                )
+            }
+            SalimChip(
+                // "+더보기"는 아이콘 없이, 더보기 항목이 골라져 있으면 그 항목의 아이콘을 붙인다.
+                leadingIcon = if (moreSelected) categoryVisual(selected.iconKey).first else null,
+                label = if (moreSelected) {
+                    stringResource(R.string.expense_category_more_selected, selected.name)
+                } else {
+                    stringResource(R.string.expense_category_more)
+                },
+                selected = moreSelected,
+                onClick = onMoreClick,
+            )
+        }
+    }
+}
+
+/** 고정 칩에 없는 카테고리만 모아 보여준다. 고르면 바로 닫힌다. "편집"은 카테고리 수정 화면으로 간다. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CategoryMoreSheet(
+    moreCategories: List<Category>,
+    selected: Category,
+    onDismiss: () -> Unit,
+    onSelect: (Category) -> Unit,
+    onEdit: () -> Unit,
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(),
+        containerColor = SalimTokens.CardSurface,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(R.string.expense_category_more_title),
+                    style = SalimType.titleLg,
+                    color = SalimTokens.TextPrimary,
+                )
+                TextButton(onClick = onEdit) {
+                    Text(stringResource(R.string.expense_category_edit), style = SalimType.bodyMd, color = SalimTokens.Accent)
+                }
+            }
+            if (moreCategories.isEmpty()) {
+                Text(
+                    stringResource(R.string.expense_category_more_empty),
+                    style = SalimType.bodyMd,
+                    color = SalimTokens.TextMuted,
+                )
+            } else {
+                ChipFlowRow {
+                    moreCategories.forEach { cat ->
                         SalimChip(
-                            label = cat,
-                            selected = !isMore && cat == selected,
-                            onClick = { if (!isMore) onSelect(cat) /* TODO 더보기: 전체 카테고리 */ },
+                            label = cat.name,
+                            selected = cat.id == selected.id,
+                            onClick = { onSelect(cat) },
+                            leadingIcon = categoryVisual(cat.iconKey).first,
                         )
                     }
                 }
@@ -305,6 +402,6 @@ private fun formatTime(hour24: Int, minute: Int): String {
 @Composable
 private fun ExpenseInputScreenPreview() {
     SalimTheme {
-        ExpenseInputScreen(onClose = {}, onSave = {})
+        ExpenseInputScreen(onClose = {}, onSave = {}, onEditCategories = {})
     }
 }

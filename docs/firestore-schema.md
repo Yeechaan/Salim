@@ -57,10 +57,9 @@
 | spentAtMillis | Long | ✅ | 지출 일시 (UTC millis, 날짜+시간 합산). **날짜별 그룹 헤더**의 소스 |
 | spenderId | String (uid) | ➕ | 지출자의 uid |
 | createdAtMillis | Long | ✅ | 등록 시각. **전체보기 정렬 = 입력 시간순**(PRD 4)의 정렬 키 |
-| categoryName | String | ✅ | 표시용 denormalize (카테고리 비활성화·이름변경 후에도 과거 지출 표시 안정) |
+| categoryName | String | ✅ | 저장 시점의 카테고리명. `categoryId`가 없거나 카테고리를 찾지 못할 때만 표시에 쓴다 |
 | memo | String? | ✅ | 메모 |
-| categoryId | String | ⬜ | categories 문서 id 참조 |
-| categoryIcon | String | ⬜ | 표시용 denormalize (아이콘 키) |
+| categoryId | String? | ✅ | categories 문서 id 참조. **표시는 이 id로 지금 이름·아이콘을 찾는다** — 이름을 바꾸면 기존 지출에도 새 이름이 보인다(PRD 7) |
 | yearMonth | String | ⬜ | `"2026-08"` 형식. 필터 조합용 등가 조회 키 |
 | updatedAtMillis | Long | ⬜ | 수정 시각 |
 
@@ -139,17 +138,22 @@
 ### {categories}/{categoryId}
 가계부 카테고리. (PRD 7. 설정 - 카테고리 수정) — `users/{userId}/categories` / `couples/{coupleId}/categories` **공통 필드 스키마**.
 
-| 필드 | 타입 | 설명 |
-|---|---|---|
-| name | String | 카테고리명 |
-| icon | String | 아이콘 키 |
-| order | Int | 표시 순서 (자주 쓰는 항목 상단 노출용) |
-| active | Boolean | `false`면 "사용 중지"(PRD 7 비활성화). 목록엔 중지 표시, 신규 지출 선택 불가. 기존 지출은 그대로 유지 |
-| isDefault | Boolean | 시드된 기본 카테고리 여부 |
-| createdAt | Timestamp | 생성 시각 |
+| 필드 | 타입 | 구현 | 설명 |
+|---|---|---|---|
+| name | String | ✅ | 카테고리명 (최대 8자, 같은 경로 안에서 중복 불가 — 클라이언트 검증) |
+| icon | String | ✅ | 아이콘 키. 기본 카테고리는 고유 키(`food`, `cafe` …), 사용자가 추가한 항목은 `custom`. 이름을 바꿔도 유지 |
+| fixed | Boolean | ✅ | `true`면 지출 입력의 고정 칩, `false`면 "+더보기" 시트. **항상 5개가 `true`** |
+| order | Int | ✅ | 표시 순서. 고정/더보기 구역 안에서 이 값으로 정렬 |
+| isDefault | Boolean | ✅ | 시드된 기본 카테고리 여부 (시드할 때만 쓴다) |
+| active | Boolean | ⬜ | `false`면 "사용 중지"(PRD 7 비활성화). 목록엔 중지 표시, 신규 지출 선택 불가. 기존 지출은 그대로 유지 — 삭제 기능과 함께 도입 |
 
-- **시드**: 최초 진입(개인) / 연결 성사(커플) 시 기본 카테고리 집합을 이 컬렉션에 생성한다. 기본 목록·아이콘 키는 design-brief와 대조 후 확정(미확정 사항 참고).
-- **삭제 정책**(PRD 7): 해당 categoryId를 참조하는 지출이 없을 때만 완전 삭제 허용, 그 외엔 `active=false` 처리.
+- **문서 id**: 기본 카테고리는 고정 id(`food`, `cafe`, `shopping`, `culture`, `travel`, `transport`, `living`, `health`, `housing`, `gift`, `etc`), 사용자가 추가한 항목은 UUID. 기본 목록은 domain `DefaultCategories`.
+- **시드**: 경로(개인/커플)의 categories가 **서버 기준으로 비어 있을 때** 앱이 기본 목록을 배치로 심는다(`FirestoreCategoryRepository`). 캐시만 비어 있는 경우엔 심지 않고 기본 목록을 화면에만 먼저 그린다. id가 고정값이라 두 사람이 동시에 심어도 같은 문서를 덮어쓸 뿐 중복이 생기지 않는다 — 그래서 연결 성사 배치에 시드를 넣지 않았다.
+- **연결 시**: 다른 가계부 데이터와 같이 개인 카테고리를 커플 경로로 옮기지 않는다. 연결 후에는 커플 경로에 기본 목록이 새로 심기고, 한쪽이 수정하면 둘 다 바뀐다.
+- **고정 교체**: 더보기 항목과 고정 항목의 `fixed`·`order`를 한 배치에서 맞바꾼다 — 고정 개수가 5개에서 벗어나는 순간이 없다.
+- **쓰기**: `SetOptions.merge()` — 이름만 바꿔 저장할 때 `isDefault` 같은 다른 필드를 지우지 않는다. 보안 규칙은 기존 `users/{uid}/**`, `couples/{id}/**` 규칙으로 통과한다.
+- **예전 지출 호환**: `categoryId` 없이 `categoryName`만 있는 지출은 저장된 이름 그대로 보여주고, 이름이 기본 카테고리와 같으면 그 아이콘을 쓴다(`"문화/여가"`는 `culture`).
+- **삭제 정책**(PRD 7, 미구현): 해당 categoryId를 참조하는 지출이 없을 때만 완전 삭제 허용, 그 외엔 `active=false` 처리.
 
 ### {budget}/{yearMonth}
 월별 예산. (PRD 7. 설정 - 달별 예산) — `users/{userId}/budget` / `couples/{coupleId}/budget` **공통 필드 스키마**. 문서 id는 `"2026-08"` 형식.
@@ -271,8 +275,6 @@ Cloud Functions 없이 **클라이언트 쓰기 + 보안 규칙**만으로 두 �
 QR 형식 오류와 네트워크 오류는 규칙 이전 단계라 클라이언트만 처리한다.
 
 ## 미확정 사항
-- 기본 카테고리 최종 목록과 아이콘 키 (design-brief 대조 후 확정)
 - 카테고리별 예산 향후 도입 여부 (PRD 10 남은 결정 필요 사항)
 - **상대 생일/기념일의 디데이 반영** — 프로필을 개인 경로에 두기로 해서 상대 생일을 읽을 수 없다. `couples.members`에 생일까지 미러링할지, 디데이 AUTO 항목은 각자 것만 볼지 결정 필요 (PRD 6과 직결)
-- **연결 성사 시 커플 카테고리 시드 시점** — 성사 배치에 넣을지, 카테고리 기능 구현 시로 미룰지. 배치에 넣으면 규칙의 문서 접근 한도와 쓰기 개수를 다시 계산해야 한다
 - **연결 해제 후 유예기간 중 공동 데이터 열람 동선** — 경로가 개인으로 되돌아가면 공동 데이터가 어느 화면에도 노출되지 않는다. 해제 설계 시 함께 정한다
