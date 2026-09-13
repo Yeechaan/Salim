@@ -17,6 +17,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -25,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -49,7 +52,7 @@ import com.chanbro.salim.domain.model.Category
 import com.chanbro.salim.domain.model.Spender
 import com.chanbro.salim.domain.model.SpenderNames
 import com.chanbro.salim.ui.common.ChipFlowRow
-import com.chanbro.salim.ui.common.categoryVisual
+import com.chanbro.salim.ui.common.CategoryChip
 import com.chanbro.salim.ui.common.DatePickerModal
 import com.chanbro.salim.ui.common.FieldDivider
 import com.chanbro.salim.ui.common.FieldRow
@@ -64,33 +67,93 @@ import com.chanbro.salim.ui.common.todayUtcMillis
 import java.util.Calendar
 
 // ---------------------------------------------------------------------------
-// 지출 입력 (expense.md 4-2) — 전체 화면 목적지
+// 지출 입력 (expense.md 4-2) / 지출 수정 (expense.md 4-3) — 전체 화면 목적지
+// 수정은 입력과 같은 레이아웃에 기존 값을 채우고, 상단에 삭제, 하단 버튼을 "수정 완료"로 바꾼다.
 // ---------------------------------------------------------------------------
 
+/**
+ * @param expenseId null이면 추가, 있으면 그 지출의 수정 화면
+ * @param onDone 저장·삭제가 끝난 뒤 (이전 화면으로 돌아간다)
+ */
 @Composable
 fun ExpenseInputScreen(
     onClose: () -> Unit,
-    onSave: () -> Unit,
+    onDone: () -> Unit,
     onEditCategories: () -> Unit,
     modifier: Modifier = Modifier,
+    expenseId: String? = null,
     viewModel: ExpenseInputViewModel = hiltViewModel(),
 ) {
-    // 미연결이면 모든 지출이 본인 것이라 지출자를 고를 이유가 없다. (expense.md 4-2)
+    LaunchedEffect(expenseId) { viewModel.load(expenseId) }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    var amountDigits by rememberSaveable { mutableStateOf("") }
-    var spender by rememberSaveable { mutableStateOf(Spender.ME) }
+    val load by viewModel.load.collectAsStateWithLifecycle()
+
+    val current = load
+    when {
+        // 목록에서 눌렀는데 그새 상대가 지웠다면 빈 수정 화면을 두지 않고 돌아간다.
+        current is ExpenseLoad.Missing -> LaunchedEffect(Unit) { onClose() }
+        // 프리필을 받기 전에는 그리지 않는다 — 수정 모드 첫 프레임(load 호출 전)도 여기에 걸린다.
+        // 빈 값으로 한 번 그려지면 입력 상태가 빈 값으로 굳기 때문이다.
+        current !is ExpenseLoad.Ready || (expenseId != null && current.initial == null) -> Unit
+        else -> ExpenseInputContent(
+            state = state,
+            isEdit = expenseId != null,
+            initial = current.initial,
+            onClose = onClose,
+            onSave = { amount, spender, category, memo, dateMillis, hour, minute ->
+                viewModel.save(
+                    amount = amount,
+                    spender = spender,
+                    category = category,
+                    memo = memo,
+                    dateUtcMillis = dateMillis,
+                    hour24 = hour,
+                    minute = minute,
+                    onDone = onDone,
+                )
+            },
+            onDelete = { viewModel.delete(onDone) },
+            onEditCategories = onEditCategories,
+            modifier = modifier,
+        )
+    }
+}
+
+@Composable
+private fun ExpenseInputContent(
+    state: ExpenseInputUiState,
+    isEdit: Boolean,
+    initial: ExpenseInitial?,
+    onClose: () -> Unit,
+    onSave: (
+        amount: Long,
+        spender: Spender,
+        category: Category,
+        memo: String,
+        dateUtcMillis: Long,
+        hour24: Int,
+        minute: Int,
+    ) -> Unit,
+    onDelete: () -> Unit,
+    onEditCategories: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var amountDigits by rememberSaveable { mutableStateOf(initial?.amount?.toString().orEmpty()) }
+    // 미연결이면 모든 지출이 본인 것이라 지출자를 고를 이유가 없다. (expense.md 4-2)
+    var spender by rememberSaveable { mutableStateOf(initial?.spender ?: Spender.ME) }
     // 선택은 id로 들고 있는다 — 카테고리 수정에서 이름이나 고정/더보기 자리가 바뀌어도 선택이 유지된다.
-    var categoryId by rememberSaveable { mutableStateOf<String?>(null) }
+    var categoryId by rememberSaveable { mutableStateOf(initial?.categoryId) }
     val category = state.categories.firstOrNull { it.id == categoryId }
         ?: state.fixedCategories.firstOrNull()
         ?: state.categories.first()
-    var memo by rememberSaveable { mutableStateOf("") }
-    var dateMillis by rememberSaveable { mutableLongStateOf(todayUtcMillis()) }
-    var hour by rememberSaveable { mutableIntStateOf(nowHour()) }
-    var minute by rememberSaveable { mutableIntStateOf(nowMinute()) }
+    var memo by rememberSaveable { mutableStateOf(initial?.memo.orEmpty()) }
+    var dateMillis by rememberSaveable { mutableLongStateOf(initial?.dateUtcMillis ?: todayUtcMillis()) }
+    var hour by rememberSaveable { mutableIntStateOf(initial?.hour24 ?: nowHour()) }
+    var minute by rememberSaveable { mutableIntStateOf(initial?.minute ?: nowMinute()) }
     var showDatePicker by rememberSaveable { mutableStateOf(false) }
     var showTimePicker by rememberSaveable { mutableStateOf(false) }
     var showCategoryMore by rememberSaveable { mutableStateOf(false) }
+    var showDeleteConfirm by rememberSaveable { mutableStateOf(false) }
 
     val canSave = amountDigits.isNotEmpty()
 
@@ -99,7 +162,7 @@ fun ExpenseInputScreen(
             .fillMaxSize()
             .background(SalimTokens.Background),
     ) {
-        InputTopBar(onClose)
+        InputTopBar(isEdit = isEdit, onClose = onClose, onDeleteClick = { showDeleteConfirm = true })
 
         Column(
             modifier = Modifier
@@ -141,18 +204,18 @@ fun ExpenseInputScreen(
         SaveButton(
             enabled = canSave,
             onClick = {
-                viewModel.save(
-                    amount = amountDigits.toLongOrNull() ?: 0L,
+                onSave(
+                    amountDigits.toLongOrNull() ?: 0L,
                     // 칩을 숨긴 상태에서 이전 선택이 남아 있어도 본인으로 저장한다.
-                    spender = if (state.connected) spender else Spender.ME,
-                    category = category,
-                    memo = memo,
-                    dateUtcMillis = dateMillis,
-                    hour24 = hour,
-                    minute = minute,
-                    onDone = onSave,
+                    if (state.connected) spender else Spender.ME,
+                    category,
+                    memo,
+                    dateMillis,
+                    hour,
+                    minute,
                 )
             },
+            label = stringResource(if (isEdit) R.string.expense_edit_done else R.string.common_save),
         )
     }
 
@@ -180,10 +243,16 @@ fun ExpenseInputScreen(
             onEdit = { showCategoryMore = false; onEditCategories() },
         )
     }
+    if (showDeleteConfirm) {
+        DeleteConfirmDialog(
+            onConfirm = { showDeleteConfirm = false; onDelete() },
+            onDismiss = { showDeleteConfirm = false },
+        )
+    }
 }
 
 @Composable
-private fun InputTopBar(onClose: () -> Unit) {
+private fun InputTopBar(isEdit: Boolean, onClose: () -> Unit, onDeleteClick: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -198,8 +267,46 @@ private fun InputTopBar(onClose: () -> Unit) {
         ) {
             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로", tint = SalimTokens.TextPrimary)
         }
-        Text("지출 입력", style = SalimType.titleLg, color = SalimTokens.TextPrimary)
+        Text(
+            stringResource(if (isEdit) R.string.expense_edit_title else R.string.expense_input_title),
+            style = SalimType.titleLg,
+            color = SalimTokens.TextPrimary,
+        )
+        if (isEdit) {
+            IconButton(onClick = onDeleteClick, modifier = Modifier.align(Alignment.CenterEnd)) {
+                Icon(
+                    Icons.Outlined.Delete,
+                    contentDescription = stringResource(R.string.expense_delete),
+                    tint = SalimTokens.TextMuted,
+                )
+            }
+        }
     }
+}
+
+/** 삭제 확인 (PRD 4 "삭제하시겠어요?"). 확인하면 지우고 전체보기로 돌아간다. */
+@Composable
+private fun DeleteConfirmDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(stringResource(R.string.expense_delete_confirm), style = SalimType.titleLg, color = SalimTokens.TextPrimary)
+        },
+        text = {
+            Text(stringResource(R.string.expense_delete_confirm_body), style = SalimType.bodyMd, color = SalimTokens.TextMuted)
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(stringResource(R.string.expense_delete), color = SalimTokens.Accent)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.common_cancel), color = SalimTokens.TextMuted)
+            }
+        },
+        containerColor = SalimTokens.CardSurface,
+    )
 }
 
 @Composable
@@ -277,24 +384,30 @@ private fun CategoryField(
         // 이름 길이가 제각각이라 개수가 아니라 폭으로 줄을 바꾼다.
         ChipFlowRow {
             fixedCategories.forEach { cat ->
-                SalimChip(
+                CategoryChip(
+                    iconKey = cat.iconKey,
+                    colorKey = cat.colorKey,
                     label = cat.name,
                     selected = cat.id == selected.id,
                     onClick = { onSelect(cat) },
-                    leadingIcon = categoryVisual(cat.iconKey).first,
                 )
             }
-            SalimChip(
-                // "+더보기"는 아이콘 없이, 더보기 항목이 골라져 있으면 그 항목의 아이콘을 붙인다.
-                leadingIcon = if (moreSelected) categoryVisual(selected.iconKey).first else null,
-                label = if (moreSelected) {
-                    stringResource(R.string.expense_category_more_selected, selected.name)
-                } else {
-                    stringResource(R.string.expense_category_more)
-                },
-                selected = moreSelected,
-                onClick = onMoreClick,
-            )
+            // 더보기 항목이 골라져 있으면 그 항목의 선택 칩("교통 ▾"), 아니면 아이콘 없는 "+더보기".
+            if (moreSelected) {
+                CategoryChip(
+                    iconKey = selected.iconKey,
+                    colorKey = selected.colorKey,
+                    label = stringResource(R.string.expense_category_more_selected, selected.name),
+                    selected = true,
+                    onClick = onMoreClick,
+                )
+            } else {
+                SalimChip(
+                    label = stringResource(R.string.expense_category_more),
+                    selected = false,
+                    onClick = onMoreClick,
+                )
+            }
         }
     }
 }
@@ -344,11 +457,12 @@ private fun CategoryMoreSheet(
             } else {
                 ChipFlowRow {
                     moreCategories.forEach { cat ->
-                        SalimChip(
+                        CategoryChip(
+                            iconKey = cat.iconKey,
+                            colorKey = cat.colorKey,
                             label = cat.name,
                             selected = cat.id == selected.id,
                             onClick = { onSelect(cat) },
-                            leadingIcon = categoryVisual(cat.iconKey).first,
                         )
                     }
                 }
@@ -402,6 +516,38 @@ private fun formatTime(hour24: Int, minute: Int): String {
 @Composable
 private fun ExpenseInputScreenPreview() {
     SalimTheme {
-        ExpenseInputScreen(onClose = {}, onSave = {}, onEditCategories = {})
+        ExpenseInputContent(
+            state = ExpenseInputUiState(),
+            isEdit = false,
+            initial = null,
+            onClose = {},
+            onSave = { _, _, _, _, _, _, _ -> },
+            onDelete = {},
+            onEditCategories = {},
+        )
+    }
+}
+
+@Preview(showBackground = true, showSystemUi = true)
+@Composable
+private fun ExpenseEditScreenPreview() {
+    SalimTheme {
+        ExpenseInputContent(
+            state = ExpenseInputUiState(connected = true),
+            isEdit = true,
+            initial = ExpenseInitial(
+                amount = 12_000,
+                dateUtcMillis = todayUtcMillis(),
+                hour24 = 12,
+                minute = 30,
+                spender = Spender.PARTNER,
+                categoryId = "cafe",
+                memo = "스타벅스",
+            ),
+            onClose = {},
+            onSave = { _, _, _, _, _, _, _ -> },
+            onDelete = {},
+            onEditCategories = {},
+        )
     }
 }

@@ -28,9 +28,12 @@ import java.util.Locale
 import java.util.TimeZone
 import javax.inject.Inject
 
-// UI 표시용 모델 (도메인 → 화면 매핑 결과). 아이콘/색은 화면에서 iconKey로 결정.
+// UI 표시용 모델 (도메인 → 화면 매핑 결과). 아이콘/색은 화면에서 iconKey/colorKey로 결정.
 data class ExpenseRowUi(
+    /** 탭 시 지출 수정 화면으로 넘길 id. (expense.md 4-1) */
+    val id: String,
     val iconKey: String,
+    val colorKey: String,
     val title: String,
     val meta: String,
     val amount: String,
@@ -108,7 +111,9 @@ class ExpenseListViewModel @Inject constructor(
     }
 
     private fun Expense.toRowUi(names: SpenderNames, category: CategoryLabel) = ExpenseRowUi(
+        id = id,
         iconKey = category.iconKey,
+        colorKey = category.colorKey,
         title = memo?.takeIf { it.isNotBlank() } ?: category.name,
         meta = "${category.name} · ${names.labelOf(spender)}",
         amount = "-${formatWon(amount)}",

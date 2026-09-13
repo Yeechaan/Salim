@@ -2,6 +2,7 @@ package com.chanbro.salim.data.repository
 
 import android.util.Log
 import com.chanbro.salim.domain.model.Category
+import com.chanbro.salim.domain.model.CategoryColors
 import com.chanbro.salim.domain.model.DefaultCategories
 import com.chanbro.salim.domain.repository.CategoryRepository
 import com.google.firebase.firestore.CollectionReference
@@ -80,6 +81,7 @@ class FirestoreCategoryRepository @Inject constructor(
                 val data = buildMap {
                     put("name", category.name)
                     put("icon", category.iconKey)
+                    put("color", category.colorKey)
                     put("fixed", category.fixed)
                     put("order", category.order)
                     if (isDefault != null) put("isDefault", isDefault)
@@ -96,6 +98,8 @@ class FirestoreCategoryRepository @Inject constructor(
         id = id,
         name = getString("name") ?: error("이름 없는 카테고리 문서: $id"),
         iconKey = getString("icon") ?: Category.CUSTOM_ICON,
+        // color 필드 이전에 심긴 기본 카테고리는 기본 색으로 읽는다. 다음 저장 때 필드가 채워진다.
+        colorKey = getString("color") ?: DefaultCategories.defaultColorKey(id) ?: CategoryColors.keys.last(),
         fixed = getBoolean("fixed") ?: false,
         order = getLong("order")?.toInt() ?: Int.MAX_VALUE,
     )

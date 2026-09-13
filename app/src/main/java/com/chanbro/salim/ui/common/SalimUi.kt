@@ -1,6 +1,7 @@
 package com.chanbro.salim.ui.common
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -293,14 +294,73 @@ fun SalimChip(
     // 한 줄에 칩을 여러 개 균등 폭으로 깔 때(예산 빠른 금액 5개) 좁은 패딩/작은 글자로 줄여 쓸 수 있다.
     horizontalPadding: Dp = 18.dp,
     textStyle: TextStyle = SalimType.bodyMd,
-    // 카테고리 칩처럼 모양으로 먼저 알아보게 할 때. 색은 글자와 같이 따라가서 칩 톤을 깨지 않는다.
-    leadingIcon: ImageVector? = null,
 ) {
     val contentColor = if (selected) Color.White else SalimTokens.Accent
+    ChipLayout(
+        label = label,
+        selected = selected,
+        onClick = onClick,
+        containerColor = if (selected) SalimTokens.Accent else SalimTokens.AccentSoft,
+        textColor = contentColor,
+        modifier = modifier,
+        horizontalPadding = horizontalPadding,
+        textStyle = textStyle,
+    )
+}
+
+/**
+ * 카테고리 칩. 미선택은 수정 화면·가계부 리스트의 아이콘 배지([CategoryIconBadge])와 같은 톤 —
+ * 카테고리색 옅은 배경 + 카테고리색 아이콘. 글자는 파스텔 위에서도 읽히게 본문색으로 둔다.
+ * 선택도 같은 카테고리색을 쓴다 — 배경을 더 진하게 채우고 같은 색 테두리 + 굵은 글자.
+ * 다른 색(Coral)으로 갈아타면 고른 순간 카테고리 색이 사라져 어색하기 때문이다.
+ * @param label 기본은 카테고리 이름. "교통 ▾"처럼 바꿔 쓸 때만 넘긴다.
+ */
+@Composable
+fun CategoryChip(
+    iconKey: String,
+    colorKey: String,
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val color = categoryColor(colorKey)
+    ChipLayout(
+        label = label,
+        selected = selected,
+        onClick = onClick,
+        containerColor = color.copy(
+            alpha = if (selected) SalimTokens.CategorySelectedAlpha else SalimTokens.CategoryTintAlpha,
+        ),
+        textColor = SalimTokens.TextPrimary,
+        modifier = modifier,
+        leadingIcon = categoryIcon(iconKey),
+        iconTint = color,
+        borderColor = if (selected) color else null,
+    )
+}
+
+@Composable
+private fun ChipLayout(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    containerColor: Color,
+    textColor: Color,
+    modifier: Modifier = Modifier,
+    horizontalPadding: Dp = 18.dp,
+    textStyle: TextStyle = SalimType.bodyMd,
+    leadingIcon: ImageVector? = null,
+    iconTint: Color = textColor,
+    borderColor: Color? = null,
+) {
+    val shape = RoundedCornerShape(percent = 50)
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(percent = 50))
-            .background(if (selected) SalimTokens.Accent else SalimTokens.AccentSoft)
+            .clip(shape)
+            .background(containerColor)
+            // 테두리는 칩 안쪽에 그려져 크기가 변하지 않는다 — 선택해도 칩 줄바꿈이 흔들리지 않는다.
+            .then(if (borderColor != null) Modifier.border(1.5.dp, borderColor, shape) else Modifier)
             .clickable(onClick = onClick)
             // 아이콘이 있으면 왼쪽 여백을 줄여 좌우가 시각적으로 같은 무게가 되게 한다.
             .padding(
@@ -313,12 +373,12 @@ fun SalimChip(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (leadingIcon != null) {
-            Icon(leadingIcon, contentDescription = null, tint = contentColor, modifier = Modifier.size(18.dp))
+            Icon(leadingIcon, contentDescription = null, tint = iconTint, modifier = Modifier.size(18.dp))
         }
         Text(
             label,
             style = textStyle.copy(fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium),
-            color = contentColor,
+            color = textColor,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -472,34 +532,50 @@ fun TimePickerModal(
 }
 
 // ---------------------------------------------------------------------------
-// 카테고리 아이콘 키 → 아이콘/색 (표시 전용 매핑) — 가계부 리스트, 홈 카테고리 차트, 카테고리 수정 공용
-// 키는 categories 문서의 icon 필드(domain DefaultCategories). 이름을 바꿔도 모양은 유지된다.
+// 카테고리 아이콘 키 / 색 키 → 표시 값 — 가계부 리스트, 홈 카테고리 차트, 칩, 카테고리 수정 공용
+// 키는 categories 문서의 icon / color 필드(domain DefaultCategories, CategoryColors). 이름을 바꿔도 모양은 유지된다.
 // ---------------------------------------------------------------------------
 
-fun categoryVisual(iconKey: String): Pair<ImageVector, Color> = when (iconKey) {
-    "food" -> Icons.Filled.Restaurant to SalimTokens.CatFood
-    "cafe" -> Icons.Filled.LocalCafe to SalimTokens.Sage
-    "shopping" -> Icons.Filled.ShoppingBag to SalimTokens.Accent
-    "culture" -> Icons.Filled.Movie to SalimTokens.CatCulture
-    "travel" -> Icons.Filled.Flight to SalimTokens.Mint
-    "transport" -> Icons.Filled.DirectionsBus to SalimTokens.CatTransport
-    "living" -> Icons.Filled.CleaningServices to SalimTokens.Accent
-    "health" -> Icons.Filled.LocalHospital to SalimTokens.Peach
-    "housing" -> Icons.Filled.Home to SalimTokens.Sage
-    "gift" -> Icons.Filled.CardGiftcard to SalimTokens.Lavender
+fun categoryIcon(iconKey: String): ImageVector = when (iconKey) {
+    "food" -> Icons.Filled.Restaurant
+    "cafe" -> Icons.Filled.LocalCafe
+    "shopping" -> Icons.Filled.ShoppingBag
+    "culture" -> Icons.Filled.Movie
+    "travel" -> Icons.Filled.Flight
+    "transport" -> Icons.Filled.DirectionsBus
+    "living" -> Icons.Filled.CleaningServices
+    "health" -> Icons.Filled.LocalHospital
+    "housing" -> Icons.Filled.Home
+    "gift" -> Icons.Filled.CardGiftcard
     // "etc"와 사용자가 추가한 항목("custom")
-    else -> Icons.Filled.Receipt to SalimTokens.Lavender
+    else -> Icons.Filled.Receipt
+}
+
+fun categoryColor(colorKey: String): Color = when (colorKey) {
+    "peach" -> SalimTokens.CatPeach
+    "sage" -> SalimTokens.CatSage
+    "rose" -> SalimTokens.CatRose
+    "lavender" -> SalimTokens.CatLavender
+    "sky" -> SalimTokens.CatSky
+    "mint" -> SalimTokens.CatMint
+    "butter" -> SalimTokens.CatButter
+    "lilac" -> SalimTokens.CatLilac
+    "clay" -> SalimTokens.CatClay
+    "apricot" -> SalimTokens.CatApricot
+    "olive" -> SalimTokens.CatOlive
+    else -> SalimTokens.CatWarmGray
 }
 
 /** 카테고리 아이콘을 옅은 같은 색 배경 위에 올린 배지. 가계부 리스트와 카테고리 수정 목록에서 쓴다. */
 @Composable
-fun CategoryIconBadge(iconKey: String, modifier: Modifier = Modifier, size: Dp = 42.dp) {
-    val (icon, color) = categoryVisual(iconKey)
+fun CategoryIconBadge(iconKey: String, colorKey: String, modifier: Modifier = Modifier, size: Dp = 42.dp) {
+    val icon = categoryIcon(iconKey)
+    val color = categoryColor(colorKey)
     Box(
         modifier = modifier
             .size(size)
             .clip(RoundedCornerShape(size * 0.31f))
-            .background(color.copy(alpha = 0.16f)),
+            .background(color.copy(alpha = SalimTokens.CategoryTintAlpha)),
         contentAlignment = Alignment.Center,
     ) {
         Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(size * 0.52f))

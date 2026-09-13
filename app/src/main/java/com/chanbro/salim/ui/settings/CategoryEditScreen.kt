@@ -45,12 +45,11 @@ import com.chanbro.salim.core.ui.theme.SalimTokens
 import com.chanbro.salim.domain.model.Category
 import com.chanbro.salim.domain.model.CategoryNameError
 import com.chanbro.salim.domain.model.DefaultCategories
+import com.chanbro.salim.ui.common.CategoryChip
 import com.chanbro.salim.ui.common.CategoryIconBadge
 import com.chanbro.salim.ui.common.ChipFlowRow
 import com.chanbro.salim.ui.common.SalimCard
-import com.chanbro.salim.ui.common.SalimChip
 import com.chanbro.salim.ui.common.SalimType
-import com.chanbro.salim.ui.common.categoryVisual
 
 // ---------------------------------------------------------------------------
 // 카테고리 수정 (settings.md 3-2, PRD 7)
@@ -222,7 +221,7 @@ private fun CategoryRow(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        CategoryIconBadge(category.iconKey, size = 36.dp)
+        CategoryIconBadge(category.iconKey, category.colorKey, size = 36.dp)
         Text(
             category.name,
             style = SalimType.bodyLg,
@@ -366,11 +365,12 @@ private fun SwapFixedSheet(
             )
             ChipFlowRow(modifier = Modifier.padding(top = 8.dp)) {
                 fixed.forEach { category ->
-                    SalimChip(
+                    CategoryChip(
+                        iconKey = category.iconKey,
+                        colorKey = category.colorKey,
                         label = category.name,
                         selected = false,
                         onClick = { onSelect(category) },
-                        leadingIcon = categoryVisual(category.iconKey).first,
                     )
                 }
             }
