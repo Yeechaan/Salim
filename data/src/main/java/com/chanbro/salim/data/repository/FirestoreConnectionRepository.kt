@@ -55,11 +55,12 @@ class FirestoreConnectionRepository @Inject constructor(
     override suspend fun createInvite(): Invite {
         val user = auth.currentUser ?: error("로그인 상태가 아닌데 초대 코드를 만들려 했다")
         val userDoc = userScope.userDoc(user.uid)
-        val previousCode = runCatching { userDoc.get().await().getString(FIELD_INVITE_CODE) }.getOrNull()
+        val snapshot = runCatching { userDoc.get().await() }.getOrNull()
+        val previousCode = snapshot?.getString(FIELD_INVITE_CODE)
 
         val now = System.currentTimeMillis()
         val expiresAt = now + INVITE_TTL_MILLIS
-        val invite = createUniqueInvite(user.uid, user.displayName, now, expiresAt)
+        val invite = createUniqueInvite(user.uid, snapshot.displayNameOr(user.displayName), now, expiresAt)
 
         userDoc.set(mapOf(FIELD_INVITE_CODE to invite.code), SetOptions.merge()).await()
         // 이전 코드 회수. 실패해도 유효기간이 짧아 곧 사라지므로 흐름을 막지 않는다.
@@ -99,6 +100,8 @@ class FirestoreConnectionRepository @Inject constructor(
         val memberIds = listOf(myUid, partnerUid).sorted()
         val coupleId = coupleIdOf(myUid, partnerUid)
         val now = System.currentTimeMillis()
+        val myName = runCatching { userScope.userDoc(myUid).get().await() }.getOrNull()
+            .displayNameOr(user.displayName)
 
         val batch = firestore.batch()
         batch.set(
@@ -107,7 +110,7 @@ class FirestoreConnectionRepository @Inject constructor(
                 "memberIds" to memberIds,
                 // 상대 이름은 초대 문서에서 받아 대신 채워 준다 — users 문서는 본인만 읽을 수 있다.
                 "members" to mapOf(
-                    myUid to memberEntry(user.displayName, user.photoUrl?.toString(), now),
+                    myUid to memberEntry(myName, user.photoUrl?.toString(), now),
                     partnerUid to memberEntry(invite.inviterName, null, now),
                 ),
                 "inviteCode" to invite.code,
@@ -183,6 +186,14 @@ class FirestoreConnectionRepository @Inject constructor(
         "photoUrl" to photoUrl,
         "joinedAt" to nowMillis,
     )
+
+    /**
+     * 상대에게 보일 내 이름. 설정 > 프로필에서 바꾼 `users/{uid}.displayName`이 우선이다(PRD 7) —
+     * 구글 이름을 쓰면 연결 전에 바꾼 이름이 상대 화면에 닿지 않는다.
+     * 문서를 못 읽었거나 이름이 비어 있으면 구글 이름으로 떨어진다.
+     */
+    private fun DocumentSnapshot?.displayNameOr(fallback: String?): String? =
+        this?.getString("displayName")?.takeIf { it.isNotBlank() } ?: fallback
 
     private fun inviteDoc(code: String) =
         firestore.collection(COLLECTION_INVITES).document(code)
