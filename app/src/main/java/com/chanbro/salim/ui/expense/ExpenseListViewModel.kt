@@ -4,10 +4,15 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.chanbro.salim.domain.model.Category
 import com.chanbro.salim.domain.model.CategoryLabel
+import com.chanbro.salim.domain.model.Connection
+import com.chanbro.salim.domain.model.DefaultCategories
 import com.chanbro.salim.domain.model.Expense
+import com.chanbro.salim.domain.model.ExpenseFilter
+import com.chanbro.salim.domain.model.Spender
 import com.chanbro.salim.domain.model.SpenderNames
 import com.chanbro.salim.domain.model.labelOf
 import com.chanbro.salim.domain.usecase.ObserveCategoriesUseCase
+import com.chanbro.salim.domain.usecase.ObserveConnectionUseCase
 import com.chanbro.salim.domain.usecase.ObserveMonthExpensesUseCase
 import com.chanbro.salim.domain.usecase.ObserveSpenderNamesUseCase
 import com.chanbro.salim.ui.common.currentYearMonth
@@ -21,6 +26,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -47,18 +53,49 @@ data class ExpenseDayUi(
 data class ExpenseListUiState(
     val year: Int = 0,
     val month: Int = 0,
+    /** 검색/필터가 걸려 있으면 조건에 맞는 지출의 합계. (expense.md 4-1 검색/필터 적용 중 표시) */
     val monthTotal: String = "0원",
     val days: List<ExpenseDayUi> = emptyList(),
-)
+    /** 이 달에 지출이 하나라도 있는지 — 빈 상태 문구가 "이번 달 없음"과 "조건에 맞는 것 없음"으로 갈린다. */
+    val monthHasExpenses: Boolean = false,
+    /** 지금 적용된 조건. 미연결이면 지출자 조건은 이미 빠져 있다. */
+    val filter: ExpenseFilter = ExpenseFilter(),
+    /** 조건에 맞는 지출 건수. */
+    val resultCount: Int = 0,
+    /** 미연결이면 필터 시트의 지출자 구역과 지출자 조건 칩을 숨긴다. */
+    val connected: Boolean = false,
+    val names: SpenderNames = SpenderNames(),
+    val categories: List<Category> = DefaultCategories.all,
+) {
+    /** 필터 시트 날짜 선택 범위 — 선택한 달의 1일 / 말일 (UTC 자정 millis). */
+    val monthStartUtc: Long get() = monthDayUtc(year, month, 1)
+    val monthEndUtc: Long get() = monthDayUtc(year, month + 1, 1) - DAY_MILLIS
+
+    /** 조건 칩으로 보여줄 카테고리. 지운 카테고리 id는 칩을 만들 수 없어 뺀다. */
+    val selectedCategories: List<Category> get() = categories.filter { it.id in filter.categoryIds }
+}
+
+private const val DAY_MILLIS = 24L * 60 * 60 * 1000
+
+private fun monthDayUtc(year: Int, month: Int, day: Int): Long =
+    Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
+        clear()
+        // month가 13이어도 Calendar가 다음 해 1월로 넘겨준다.
+        set(year, month - 1, day)
+    }.timeInMillis
 
 @HiltViewModel
 class ExpenseListViewModel @Inject constructor(
     observeMonth: ObserveMonthExpensesUseCase,
     observeSpenderNames: ObserveSpenderNamesUseCase,
     observeCategories: ObserveCategoriesUseCase,
+    observeConnection: ObserveConnectionUseCase,
 ) : ViewModel() {
 
     private val yearMonth = MutableStateFlow(currentYearMonth())
+
+    /** 검색어 + 필터. 화면을 오가도(수정 화면 → 복귀) 유지된다. */
+    private val filter = MutableStateFlow(ExpenseFilter())
 
     /** 달을 결과와 함께 들고 다닌다 — 따로 combine하면 달이 먼저 바뀌어 헤더와 목록이 어긋난다. */
     private data class MonthExpenses(val year: Int, val month: Int, val expenses: List<Expense>)
@@ -70,8 +107,15 @@ class ExpenseListViewModel @Inject constructor(
         }
 
     val uiState: StateFlow<ExpenseListUiState> =
-        combine(monthExpenses, observeSpenderNames(), observeCategories()) { month, names, categories ->
-            toUiState(month.year, month.month, month.expenses, names, categories)
+        combine(
+            monthExpenses,
+            observeSpenderNames(),
+            observeCategories(),
+            observeConnection(),
+            filter,
+        ) { month, names, categories, connection, filter ->
+            val connected = connection is Connection.Connected
+            toUiState(month, names, categories, connected, filter.forConnection(connected))
         }
         .stateIn(
             scope = viewModelScope,
@@ -80,19 +124,52 @@ class ExpenseListViewModel @Inject constructor(
             initialValue = currentYearMonth().let { (y, m) -> ExpenseListUiState(year = y, month = m) },
         )
 
+    /** 달을 바꾸면 기간 조건만 푼다 — 다른 달의 날짜라 맞을 수가 없다. (PRD 4 전체보기) */
     fun setMonth(year: Int, month: Int) {
+        filter.update { it.withPeriod(null, null) }
         yearMonth.value = year to month
     }
 
+    fun setQuery(query: String) {
+        filter.update { it.copy(query = query) }
+    }
+
+    /** 필터 시트 "적용하기". 검색어는 시트가 다루지 않으므로 지금 값을 유지한다. */
+    fun applyConditions(conditions: ExpenseFilter) {
+        filter.update {
+            it.copy(
+                categoryIds = conditions.categoryIds,
+                spenders = conditions.spenders,
+            ).withPeriod(conditions.startDayUtc, conditions.endDayUtc)
+        }
+    }
+
+    fun clearPeriod() {
+        filter.update { it.withPeriod(null, null) }
+    }
+
+    fun removeCategory(id: String) {
+        filter.update { it.copy(categoryIds = it.categoryIds - id) }
+    }
+
+    fun removeSpender(spender: Spender) {
+        filter.update { it.copy(spenders = it.spenders - spender) }
+    }
+
+    /** 결과 없음의 "필터 초기화" — 검색어까지 모두 비운다. (expense.md 4-1 상태 분기) */
+    fun clearAll() {
+        filter.value = ExpenseFilter()
+    }
+
     private fun toUiState(
-        year: Int,
-        month: Int,
-        expenses: List<Expense>,
+        month: MonthExpenses,
         names: SpenderNames,
         categories: List<Category>,
+        connected: Boolean,
+        filter: ExpenseFilter,
     ): ExpenseListUiState {
-        val total = expenses.sumOf { it.amount }
-        val days = expenses
+        val shown = filter.apply(month.expenses, categories)
+        val days = shown
             .groupBy { dayStartUtc(it.spentAtMillis) }
             .entries
             .sortedByDescending { it.key }
@@ -103,10 +180,16 @@ class ExpenseListViewModel @Inject constructor(
                 )
             }
         return ExpenseListUiState(
-            year = year,
-            month = month,
-            monthTotal = formatWon(total),
+            year = month.year,
+            month = month.month,
+            monthTotal = formatWon(shown.sumOf { it.amount }),
             days = days,
+            monthHasExpenses = month.expenses.isNotEmpty(),
+            filter = filter,
+            resultCount = shown.size,
+            connected = connected,
+            names = names,
+            categories = categories,
         )
     }
 

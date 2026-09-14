@@ -86,7 +86,9 @@
 | + 카테고리 필터 | `where yearMonth == ? where categoryId == ? orderBy createdAtMillis desc` | (yearMonth, categoryId, createdAtMillis) |
 | + 지출자 필터 | `where yearMonth == ? where spenderId == ? orderBy createdAtMillis desc` | (yearMonth, spenderId, createdAtMillis) |
 
-- 기간 필터(월 범위)는 `yearMonth` `in` 조건으로 여러 달을 조회.
+- **1차 구현(현재)**: 기간(선택한 달 안의 날짜 범위)·카테고리·지출자 필터와 메모 검색은 모두 **이미 구독 중인 월 조회 결과를 클라이언트에서 거른다**. 스코프가 한 달이라 문서 수가 적고, 쿼리를 새로 걸지 않으니 추가 읽기 비용·복합 인덱스·스키마 변경이 없다. 위 표의 필터 쿼리와 `yearMonth`는 여러 달 조회 등으로 서버 쿼리가 필요해질 때 도입한다.
+  - 카테고리 필터는 `categoryId`로 비교하되, id 없는 예전 지출은 이름으로 카테고리를 찾아 비교한다 (수정 화면 프리필과 같은 규칙).
+- 기간 필터(월 범위)는 `yearMonth` `in` 조건으로 여러 달을 조회. (여러 달 조회 도입 시)
 - **메모 검색**: Firestore는 전문검색을 지원하지 않는다. 1차는 로드된 해당 월 결과를 **클라이언트 측 부분일치**로 필터링한다(스코프가 "이번 달"이라 비용 문제 없음). 전역 검색이 필요해지면 외부 검색(Algolia 등) 재검토.
 
 ### couples/{coupleId}/schedules/{scheduleId}
