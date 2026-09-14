@@ -53,7 +53,7 @@ service cloud.firestore {
     }
 
     // 개인(미연결) 데이터 — 본인만 read/write.
-    // users/{uid}/expenses|schedules|ddays|budget 이 여기에 걸린다.
+    // users/{uid}/expenses|schedules|todos|ddays|budget 이 여기에 걸린다.
     match /users/{userId} {
       allow read, write: if isOwner(userId);
 

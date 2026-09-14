@@ -28,6 +28,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import dagger.hilt.android.AndroidEntryPoint
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -50,6 +51,7 @@ import com.chanbro.salim.ui.dday.DDayInputScreen
 import com.chanbro.salim.ui.dday.DDayScreen
 import com.chanbro.salim.ui.expense.ExpenseInputScreen
 import com.chanbro.salim.ui.expense.ExpenseScreen
+import com.chanbro.salim.ui.todo.TodoScreen
 import com.chanbro.salim.ui.auth.LoginScreen
 import com.chanbro.salim.ui.home.HomeScreen
 import com.chanbro.salim.ui.onboarding.OnboardingScreen
@@ -64,6 +66,7 @@ private const val ROUTE_ONBOARDING = "onboarding"
 private const val ROUTE_LOGIN = "login"
 private const val ROUTE_EXPENSE_INPUT = "expense_input"
 private const val ROUTE_EXPENSE_EDIT = "expense_edit/{expenseId}"
+private const val ROUTE_DDAY_MANAGE = "dday_manage"
 private const val ROUTE_DDAY_INPUT = "dday_input"
 private const val ROUTE_DDAY_EDIT = "dday_edit/{ddayId}"
 private const val ROUTE_SCHEDULE_INPUT = "schedule_input/{dateMillis}"
@@ -133,6 +136,8 @@ private fun SalimNavGraph(
 
     // 일정 FAB가 캘린더에서 선택 중인 날짜를 기본값으로 넘기기 위해 끌어올린 상태.
     var selectedScheduleDate by rememberSaveable { mutableLongStateOf(todayUtc()) }
+    // 할 일 FAB는 화면 안의 시트를 연다 — 요청만 끌어올리고 시트 상태는 화면이 가진다.
+    var todoAddRequested by rememberSaveable { mutableStateOf(false) }
 
     val tabRoutes = SalimTab.entries.map { it.route }.toSet()
     val onTabRoute = currentRoute in tabRoutes
@@ -169,7 +174,7 @@ private fun SalimNavGraph(
             }
         },
         floatingActionButton = {
-            // FAB 노출 규칙(main-shell.md): 가계부/일정/디데이
+            // FAB 노출 규칙(main-shell.md): 가계부/일정/할 일. 디데이 관리는 하위 화면이라 자기 FAB를 그린다.
             when (currentRoute) {
                 SalimTab.Expense.route -> {
                     FloatingActionButton(
@@ -189,13 +194,13 @@ private fun SalimNavGraph(
                         Icon(Icons.Filled.Add, contentDescription = "일정 등록")
                     }
                 }
-                SalimTab.DDay.route -> {
+                SalimTab.Todo.route -> {
                     FloatingActionButton(
-                        onClick = { navController.navigate(ROUTE_DDAY_INPUT) },
+                        onClick = { todoAddRequested = true },
                         containerColor = SalimTokens.Accent,
                         contentColor = Color.White,
                     ) {
-                        Icon(Icons.Filled.Add, contentDescription = "디데이 추가")
+                        Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.todo_add))
                     }
                 }
             }
@@ -209,7 +214,10 @@ private fun SalimNavGraph(
             composable(ROUTE_ONBOARDING) { OnboardingScreen(onFinish = onOnboardingFinished) }
             composable(ROUTE_LOGIN) { LoginScreen() }
             composable(SalimTab.Home.route) {
-                HomeScreen(onConnectClick = { navController.navigate(ROUTE_CONNECT) })
+                HomeScreen(
+                    onConnectClick = { navController.navigate(ROUTE_CONNECT) },
+                    onDDayClick = { navController.navigate(ROUTE_DDAY_MANAGE) },
+                )
             }
             composable(SalimTab.Expense.route) {
                 ExpenseScreen(onItemClick = { row -> navController.navigate(expenseEditRoute(row.id)) })
@@ -220,8 +228,17 @@ private fun SalimNavGraph(
                     onSelectedDateChange = { selectedScheduleDate = it },
                 )
             }
-            composable(SalimTab.DDay.route) {
+            composable(SalimTab.Todo.route) {
+                TodoScreen(
+                    addRequested = todoAddRequested,
+                    onAddHandled = { todoAddRequested = false },
+                )
+            }
+            // 설정 > 디데이 관리 / 홈 디데이 카드 (dday.md 6-1)
+            composable(ROUTE_DDAY_MANAGE) {
                 DDayScreen(
+                    onBack = { navController.popBackStack() },
+                    onAddClick = { navController.navigate(ROUTE_DDAY_INPUT) },
                     onItemClick = { row ->
                         // 자동 반영 항목(생일/기념일)은 설정 > 프로필에서만 수정 (PRD 6.)
                         // TODO: 자동 항목 탭 시 안내/프로필 이동 흐름 확정 필요 (dday.md 6-1)
@@ -233,6 +250,7 @@ private fun SalimNavGraph(
                 SettingsScreen(
                     onProfileClick = { navController.navigate(ROUTE_PROFILE_EDIT) },
                     onCategoryClick = { navController.navigate(ROUTE_CATEGORY_EDIT) },
+                    onDDayClick = { navController.navigate(ROUTE_DDAY_MANAGE) },
                     onConnectClick = { navController.navigate(ROUTE_CONNECT) },
                 )
             }

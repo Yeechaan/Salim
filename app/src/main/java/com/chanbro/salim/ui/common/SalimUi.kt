@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.DirectionsBus
 import androidx.compose.material.icons.filled.CardGiftcard
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Flight
 import androidx.compose.material.icons.filled.LocalHospital
@@ -242,7 +243,8 @@ enum class SalimTab(val label: String, val icon: ImageVector, val route: String)
     Home("홈", Icons.Filled.Home, "home"),
     Expense("가계부", Icons.Filled.AccountBalanceWallet, "expense"),
     Schedule("일정", Icons.Filled.CalendarToday, "schedule"),
-    DDay("디데이", Icons.Filled.CardGiftcard, "dday"),
+    // 디데이는 탭에서 빠져 홈 카드 + 설정 > 디데이 관리로 옮겼다 (PRD 2/6/11)
+    Todo("할 일", Icons.Filled.Checklist, "todo"),
     Settings("설정", Icons.Filled.Settings, "settings"),
 }
 
