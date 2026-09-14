@@ -8,8 +8,8 @@
 
 | 상태 | 경로(SSOT) |
 |---|---|
-| 미연결 | `users/{userId}/{expenses,schedules,ddays,categories,budget}` |
-| 연결 | `couples/{coupleId}/{expenses,schedules,ddays,categories,budget}` |
+| 미연결 | `users/{userId}/{expenses,schedules,todos,ddays,categories,budget}` |
+| 연결 | `couples/{coupleId}/{expenses,schedules,todos,ddays,categories,budget}` |
 
 - 경로 선택은 `data/repository/UserScope`가 전담한다. 저장소들은 경로를 직접 계산하지 않고 아래 두 가지만 쓴다.
 
@@ -134,8 +134,35 @@
 | createdAtMillis | Number | 등록 시각 |
 
 - 정렬(가까운 순)은 저장 시점이 아니라 표시 시점에 계산한다. 매년 반복 항목은 저장된 날짜와 다음 기념일이 다르기 때문에 Firestore `orderBy`로는 정렬할 수 없다.
-- AUTO 항목은 `users/{userId}`의 birthday/anniversary에서 파생된다. 디데이 탭에서 수정·삭제 불가.
+- AUTO 항목은 `users/{userId}`의 birthday/anniversary에서 파생된다. 디데이 관리(설정)에서 수정·삭제 불가.
 - 가계부와 동일하게, 현재 구현 경로는 `users/{uid}/ddays` (미연결 개인 경로).
+
+### {todos}/{todoId}
+할 일. (PRD 11. 할 일) 경로는 다른 공유 데이터와 같다 — 미연결 `users/{uid}/todos`, 연결 `couples/{coupleId}/todos`.
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| title | String | 제목 (최대 30자) |
+| assignee | String | `SHARED`(함께) / `PERSONAL`(한 사람) |
+| ownerId | String (uid)? | `PERSONAL`일 때 담당자 uid. `SHARED`면 없음 |
+| parentId | String? | 하위 항목이면 상위 할 일의 문서 id. 상위 항목은 없음(null) |
+| done | Boolean | 완료 여부 |
+| completedAtMillis | Number? | 완료 시각. 완료 섹션 정렬 키(최근 완료순). 체크 해제 시 비운다 |
+| createdAtMillis | Number | 등록 시각. 미완료 정렬 키(등록순). 수정해도 유지 |
+| updatedAtMillis | Number? | 수정 시각 (제목·담당자 수정 때만) |
+
+- 담당자는 일정의 `type`+`ownerId`와 같은 이유로 **보는 사람 기준 상대값("나"/"상대") 대신 uid로 저장**한다. 읽을 때 `ownerId == 내 uid ? 나 : 상대방`.
+- **하위 항목은 같은 `todos` 컬렉션에 `parentId`를 달아 평평하게 저장한다.** (PRD 11 하위 항목, 한 단계만)
+  - 상위 문서 안의 배열로 두지 않는 이유: 두 사람이 서로 다른 하위 항목을 동시에 체크하면 배열 전체를 다시 쓰다가 한쪽 체크가 사라진다. 문서가 따로면 필드 단위 update라 충돌하지 않는다.
+  - 서브컬렉션(`todos/{id}/subtasks`)으로 두지 않는 이유: 상위 항목마다 리스너가 하나씩 늘어난다. 평평하게 두면 기존 리스너 하나로 전부 받는다.
+  - 상위 항목 체크 = 상위 + 아직 안 끝난 하위 항목의 `done`·`completedAtMillis`를 **한 배치**로 update. 이미 완료된 하위 항목의 완료 시각은 건드리지 않는다.
+  - 상위 항목 삭제 = 상위 + 하위 항목을 **한 배치**로 delete. 시트 저장(상위 수정 + 하위 추가·수정·삭제)도 한 배치.
+  - 상위 문서가 없는 하위 항목(다른 기기에서 배치 중간에 끊긴 경우 등)은 표시하지 않는다.
+  - 하위호환: 기존 문서에는 `parentId`가 없어 모두 상위 항목으로 읽힌다. 마이그레이션 불필요.
+- 컬렉션 전체를 리스너 하나로 구독하고 정렬·완료 분리는 클라이언트에서 한다. 커플 한 쌍의 할 일은 많지 않고, `done`별 쿼리 두 개로 나누면 체크할 때 항목이 한 리스너에서 빠지고 다른 리스너에 들어오는 사이 깜빡인다. 복합 인덱스 불필요.
+- 완료 토글은 `done`·`completedAtMillis` 두 필드만 update한다 — 두 사람이 동시에 한 사람은 체크, 한 사람은 제목 수정을 해도 서로 덮어쓰지 않게.
+- 보안 규칙: 기존 `users/{userId}/{document=**}`, `couples/{coupleId}/{document=**}` 와일드카드가 그대로 적용된다. 규칙 변경 없음.
+- 완료 항목 자동 정리(오래된 완료 삭제)는 1차 범위 밖. 쌓이면 리스너 비용이 늘어나므로 도입 시 검토.
 
 ### {categories}/{categoryId}
 가계부 카테고리. (PRD 7. 설정 - 카테고리 수정) — `users/{userId}/categories` / `couples/{coupleId}/categories` **공통 필드 스키마**.

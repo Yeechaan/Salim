@@ -60,6 +60,7 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
     onProfileClick: () -> Unit = {},
     onCategoryClick: () -> Unit = {},
+    onDDayClick: () -> Unit = {},
     onConnectClick: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
@@ -72,6 +73,7 @@ fun SettingsScreen(
         modifier = modifier,
         onProfileClick = onProfileClick,
         onCategoryClick = onCategoryClick,
+        onDDayClick = onDDayClick,
         onConnectClick = onConnectClick,
         onBudgetClick = { showBudgetSheet = true },
         onSignOutClick = { confirmingSignOut = true },
@@ -107,6 +109,7 @@ private fun SettingsContent(
     modifier: Modifier = Modifier,
     onProfileClick: () -> Unit,
     onCategoryClick: () -> Unit,
+    onDDayClick: () -> Unit,
     onConnectClick: () -> Unit,
     onBudgetClick: () -> Unit,
     onSignOutClick: () -> Unit,
@@ -127,6 +130,13 @@ private fun SettingsContent(
                     label = "프로필 수정",
                     value = state.profileText,
                     onClick = onProfileClick,
+                )
+                RowDivider()
+                // 디데이는 하단 탭에서 빠져 여기서 관리한다 (PRD 6/7)
+                SettingsRow(
+                    label = stringResource(R.string.settings_dday_manage),
+                    value = "",
+                    onClick = onDDayClick,
                 )
                 RowDivider()
                 SettingsRow(
@@ -353,6 +363,7 @@ private fun SettingsScreenPreview() {
             modifier = Modifier.background(SalimTokens.Background),
             onProfileClick = {},
             onCategoryClick = {},
+            onDDayClick = {},
             onConnectClick = {},
             onBudgetClick = {},
             onSignOutClick = {},

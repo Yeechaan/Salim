@@ -9,99 +9,122 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.chanbro.salim.R
 import com.chanbro.salim.core.ui.theme.SalimTheme
 import com.chanbro.salim.core.ui.theme.SalimTokens
 import com.chanbro.salim.ui.common.DDayBadge
 import com.chanbro.salim.ui.common.SalimCard
-import com.chanbro.salim.ui.common.SalimTab
 import com.chanbro.salim.ui.common.SalimType
 
 // ---------------------------------------------------------------------------
-// 디데이 리스트 (dday.md 6-1) — 탭 랜딩 화면
-// 하단 탭바/FAB는 상위 Scaffold가 제공, 여기서는 콘텐츠만
+// 디데이 관리 (dday.md 6-1) — 설정 하위 화면. 진입: 설정 "디데이 관리", 홈 디데이 카드
+// 탭 화면이 아니라 상위 Scaffold의 FAB가 없으므로 추가 버튼을 직접 그린다.
 // ---------------------------------------------------------------------------
 
 @Composable
 fun DDayScreen(
+    onBack: () -> Unit,
+    onAddClick: () -> Unit,
     modifier: Modifier = Modifier,
     onItemClick: (DDayRowUi) -> Unit = {},
     viewModel: DDayListViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    DDayContent(state = state, modifier = modifier, onItemClick = onItemClick)
+    DDayContent(state = state, modifier = modifier, onBack = onBack, onAddClick = onAddClick, onItemClick = onItemClick)
 }
 
 @Composable
 private fun DDayContent(
     state: DDayListUiState,
     modifier: Modifier = Modifier,
+    onBack: () -> Unit,
+    onAddClick: () -> Unit,
     onItemClick: (DDayRowUi) -> Unit,
 ) {
-    Column(modifier = modifier.fillMaxSize()) {
-        DDayTopBar()
-        if (state.rows.isEmpty()) {
-            EmptyState()
-        } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
-            ) {
-                SalimCard(cornerRadius = 24.dp) {
-                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        state.rows.forEachIndexed { index, row ->
-                            DDayItemRow(row = row, onClick = { onItemClick(row) })
-                            if (index != state.rows.lastIndex) {
-                                RowDivider()
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            DDayTopBar(onBack)
+            if (state.rows.isEmpty()) {
+                EmptyState()
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        // FAB에 마지막 줄이 가리지 않게 아래 여백을 넉넉히 둔다.
+                        .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 96.dp),
+                ) {
+                    SalimCard(cornerRadius = 24.dp) {
+                        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                            state.rows.forEachIndexed { index, row ->
+                                DDayItemRow(row = row, onClick = { onItemClick(row) })
+                                if (index != state.rows.lastIndex) {
+                                    RowDivider()
+                                }
                             }
                         }
                     }
                 }
             }
         }
+        FloatingActionButton(
+            onClick = onAddClick,
+            containerColor = SalimTokens.Accent,
+            contentColor = Color.White,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .navigationBarsPadding()
+                .padding(16.dp),
+        ) {
+            Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.dday_add))
+        }
     }
 }
 
+/** 설정 하위 화면 공통 상단 — 카테고리 수정과 같은 형태. */
 @Composable
-private fun DDayTopBar() {
-    Surface(color = SalimTokens.Background) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .height(60.dp)
-                .padding(horizontal = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // 하단 탭바와 같은 아이콘을 참조해 탭 ↔ 상단 바를 같은 기호로 묶는다
+private fun DDayTopBar(onBack: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .statusBarsPadding()
+            .height(56.dp)
+            .padding(horizontal = 4.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart)) {
             Icon(
-                SalimTab.DDay.icon,
-                contentDescription = null,
-                tint = SalimTokens.Accent,
-                modifier = Modifier.size(20.dp),
+                Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = stringResource(R.string.common_back),
+                tint = SalimTokens.TextPrimary,
             )
-            Text("디데이", style = SalimType.headlineSm, color = SalimTokens.TextPrimary)
         }
+        Text(stringResource(R.string.dday_manage_title), style = SalimType.titleLg, color = SalimTokens.TextPrimary)
     }
 }
 
@@ -164,7 +187,7 @@ private fun EmptyState() {
             .padding(horizontal = 20.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text("디데이를 추가해보세요", style = SalimType.bodyLg, color = SalimTokens.TextMuted)
+        Text(stringResource(R.string.dday_empty), style = SalimType.bodyLg, color = SalimTokens.TextMuted)
     }
 }
 
@@ -185,6 +208,8 @@ private fun DDayScreenPreview() {
                 ),
             ),
             modifier = Modifier.background(SalimTokens.Background),
+            onBack = {},
+            onAddClick = {},
             onItemClick = {},
         )
     }
@@ -197,6 +222,8 @@ private fun DDayScreenEmptyPreview() {
         DDayContent(
             state = DDayListUiState(),
             modifier = Modifier.background(SalimTokens.Background),
+            onBack = {},
+            onAddClick = {},
             onItemClick = {},
         )
     }

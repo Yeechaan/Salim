@@ -18,6 +18,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Person
@@ -54,7 +55,6 @@ import com.chanbro.salim.ui.common.MonthPickerSheet
 import com.chanbro.salim.ui.common.MonthSelector
 import com.chanbro.salim.ui.common.BudgetInputSheet
 import com.chanbro.salim.ui.common.SalimCard
-import com.chanbro.salim.ui.common.SalimTab
 import com.chanbro.salim.ui.common.SalimType
 import com.chanbro.salim.ui.common.categoryColor
 import com.chanbro.salim.ui.connect.ConnectViewModel
@@ -68,6 +68,7 @@ import com.chanbro.salim.ui.dday.DDayListViewModel
 fun HomeScreen(
     modifier: Modifier = Modifier,
     onConnectClick: () -> Unit = {},
+    onDDayClick: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -90,7 +91,7 @@ fun HomeScreen(
             ConnectBanner(onClick = onConnectClick)
             BudgetCard(state = state, onClick = { showBudgetSheet = true })
             CategoryCard(state.categories)
-            UpcomingDDayCard()
+            UpcomingDDayCard(onClick = onDDayClick)
             RecentTransactionsCard(state.recent)
         }
     }
@@ -355,28 +356,35 @@ private fun DonutChart(categories: List<CategorySpendUi>) {
 }
 
 @Composable
-private fun UpcomingDDayCard(viewModel: DDayListViewModel = hiltViewModel()) {
+private fun UpcomingDDayCard(onClick: () -> Unit, viewModel: DDayListViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     // 가장 가까운 1~2건만 노출. 이미 지난 항목은 제외 (wireframe/home.md 4.)
     val upcoming = state.rows.filterNot { it.dDayText.startsWith("D+") }.take(2)
 
-    SalimCard(cornerRadius = 24.dp) {
+    // 디데이 탭이 없어져 카드 전체가 설정 > 디데이 관리로 가는 입구다 (home.md 4)
+    SalimCard(cornerRadius = 24.dp, modifier = Modifier.clickable(onClick = onClick)) {
         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Row(
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                // 하단 탭바와 같은 아이콘을 참조해 홈 카드 ↔ 디데이 탭을 같은 기호로 묶는다
                 Icon(
-                    SalimTab.DDay.icon,
+                    Icons.Filled.CardGiftcard,
                     contentDescription = null,
                     tint = SalimTokens.Accent,
                     modifier = Modifier.size(20.dp),
                 )
-                Text("디데이", style = SalimType.headlineSm, color = SalimTokens.TextPrimary)
+                Text(
+                    stringResource(R.string.dday_title),
+                    style = SalimType.headlineSm,
+                    color = SalimTokens.TextPrimary,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(stringResource(R.string.dday_see_all), style = SalimType.labelMd, color = SalimTokens.Accent)
             }
             if (upcoming.isEmpty()) {
-                Text("디데이를 추가해보세요", style = SalimType.bodyMd, color = SalimTokens.TextMuted)
+                Text(stringResource(R.string.dday_empty), style = SalimType.bodyMd, color = SalimTokens.TextMuted)
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     upcoming.forEach { row ->

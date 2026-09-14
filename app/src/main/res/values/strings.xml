@@ -36,7 +36,7 @@
     <string name="profile_anniversary">기념일</string>
     <string name="profile_empty">미입력</string>
     <string name="profile_clear">지우기</string>
-    <string name="profile_guide">이름은 가계부의 지출자 표시에, 생일과 기념일은 디데이 탭에 자동으로 반영돼요.</string>
+    <string name="profile_guide">이름은 가계부의 지출자 표시에, 생일과 기념일은 디데이에 자동으로 반영돼요.</string>
 
     <!-- 상대방 연결 (docs/wireframe/connect.md 9-1~9-5) -->
     <string name="connect_title">상대방 연결</string>
@@ -86,6 +86,41 @@
     <string name="connect_error_partner_connected">상대방이 이미 다른 분과 연결돼 있어요</string>
     <string name="connect_error_qr">QR을 다시 확인해주세요</string>
     <string name="connect_error_network">연결에 실패했어요. 잠시 후 다시 시도해주세요</string>
+
+    <!-- 할 일 (docs/wireframe/todo.md 11-1, 11-2) -->
+    <string name="todo_tab">할 일</string>
+    <string name="todo_title">할 일</string>
+    <string name="todo_add">할 일 추가</string>
+    <string name="todo_edit">할 일 수정</string>
+    <string name="todo_empty">할 일을 추가해보세요</string>
+    <string name="todo_all_done">모두 끝냈어요</string>
+    <string name="todo_done_section">완료 %d</string>
+    <string name="todo_title_hint">할 일을 입력하세요</string>
+    <string name="todo_assignee">담당자</string>
+    <string name="todo_assignee_together">함께</string>
+    <string name="todo_edit_done">수정 완료</string>
+    <string name="todo_check">완료로 표시</string>
+    <string name="todo_uncheck">완료 해제</string>
+    <string name="todo_delete">삭제</string>
+    <string name="todo_delete_confirm">삭제하시겠어요?</string>
+    <string name="todo_delete_confirm_body">삭제하면 되돌릴 수 없어요.</string>
+    <string name="todo_subtasks">하위 항목</string>
+    <string name="todo_subtask_add">+ 하위 항목 추가</string>
+    <string name="todo_subtask_hint">하위 항목</string>
+    <string name="todo_subtask_remove">하위 항목 지우기</string>
+    <string name="todo_subtask_progress">%1$d/%2$d</string>
+    <string name="todo_delete_with_subtasks">하위 항목 %d개도 함께 삭제돼요.</string>
+    <string name="todo_assignee_change">담당자 바꾸기</string>
+    <string name="todo_expand">펼치기</string>
+    <string name="todo_collapse">접기</string>
+
+    <!-- 디데이 관리 (docs/wireframe/dday.md 6-1, home.md 4) -->
+    <string name="dday_manage_title">디데이 관리</string>
+    <string name="dday_title">디데이</string>
+    <string name="dday_add">디데이 추가</string>
+    <string name="dday_see_all">전체보기</string>
+    <string name="dday_empty">디데이를 추가해보세요</string>
+    <string name="settings_dday_manage">디데이 관리</string>
 
     <!-- 가계부 전체보기 · 검색/필터 (docs/wireframe/expense.md 4-1) -->
     <string name="expense_title">가계부</string>
