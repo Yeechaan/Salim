@@ -38,6 +38,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -52,6 +53,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -294,6 +296,8 @@ fun SalimChip(
     // 한 줄에 칩을 여러 개 균등 폭으로 깔 때(예산 빠른 금액 5개) 좁은 패딩/작은 글자로 줄여 쓸 수 있다.
     horizontalPadding: Dp = 18.dp,
     textStyle: TextStyle = SalimType.bodyMd,
+    // 조건 칩(해제 가능)의 ✕ 등 라벨 뒤 아이콘. (design.md 칩 - 조건 칩)
+    trailingIcon: ImageVector? = null,
 ) {
     val contentColor = if (selected) Color.White else SalimTokens.Accent
     ChipLayout(
@@ -305,6 +309,7 @@ fun SalimChip(
         modifier = modifier,
         horizontalPadding = horizontalPadding,
         textStyle = textStyle,
+        trailingIcon = trailingIcon,
     )
 }
 
@@ -314,6 +319,7 @@ fun SalimChip(
  * 선택도 같은 카테고리색을 쓴다 — 배경을 더 진하게 채우고 같은 색 테두리 + 굵은 글자.
  * 다른 색(Coral)으로 갈아타면 고른 순간 카테고리 색이 사라져 어색하기 때문이다.
  * @param label 기본은 카테고리 이름. "교통 ▾"처럼 바꿔 쓸 때만 넘긴다.
+ * @param trailingIcon 조건 칩(해제 가능)의 ✕ 아이콘. 색은 카테고리색을 따른다.
  */
 @Composable
 fun CategoryChip(
@@ -323,6 +329,7 @@ fun CategoryChip(
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    trailingIcon: ImageVector? = null,
 ) {
     val color = categoryColor(colorKey)
     ChipLayout(
@@ -337,6 +344,7 @@ fun CategoryChip(
         leadingIcon = categoryIcon(iconKey),
         iconTint = color,
         borderColor = if (selected) color else null,
+        trailingIcon = trailingIcon,
     )
 }
 
@@ -353,6 +361,7 @@ private fun ChipLayout(
     leadingIcon: ImageVector? = null,
     iconTint: Color = textColor,
     borderColor: Color? = null,
+    trailingIcon: ImageVector? = null,
 ) {
     val shape = RoundedCornerShape(percent = 50)
     Row(
@@ -365,7 +374,7 @@ private fun ChipLayout(
             // 아이콘이 있으면 왼쪽 여백을 줄여 좌우가 시각적으로 같은 무게가 되게 한다.
             .padding(
                 start = if (leadingIcon != null) horizontalPadding - 4.dp else horizontalPadding,
-                end = horizontalPadding,
+                end = if (trailingIcon != null) horizontalPadding - 4.dp else horizontalPadding,
                 top = 10.dp,
                 bottom = 10.dp,
             ),
@@ -382,6 +391,9 @@ private fun ChipLayout(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+        if (trailingIcon != null) {
+            Icon(trailingIcon, contentDescription = null, tint = iconTint, modifier = Modifier.size(16.dp))
+        }
     }
 }
 
@@ -467,8 +479,22 @@ fun DatePickerModal(
     initialMillis: Long,
     onConfirm: (Long) -> Unit,
     onDismiss: () -> Unit,
+    // 고를 수 있는 날짜 범위 (UTC 자정 millis, 양끝 포함). 가계부 필터는 선택한 달 안으로 막는다.
+    minDateUtc: Long? = null,
+    maxDateUtc: Long? = null,
 ) {
-    val state = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
+    val selectableDates = remember(minDateUtc, maxDateUtc) {
+        object : SelectableDates {
+            override fun isSelectableDate(utcTimeMillis: Long): Boolean =
+                (minDateUtc == null || utcTimeMillis >= minDateUtc) && (maxDateUtc == null || utcTimeMillis <= maxDateUtc)
+        }
+    }
+    val state = rememberDatePickerState(
+        initialSelectedDateMillis = initialMillis,
+        // 범위를 막으면 달력도 그 달에서 열리게 한다.
+        initialDisplayedMonthMillis = initialMillis,
+        selectableDates = selectableDates,
+    )
     DatePickerDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
