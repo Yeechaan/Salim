@@ -97,7 +97,7 @@
     <string name="todo_done_section">완료 %d</string>
     <string name="todo_title_hint">할 일을 입력하세요</string>
     <string name="todo_assignee">담당자</string>
-    <string name="todo_assignee_together">함께</string>
+    <string name="todo_assignee_together">우리</string>
     <string name="todo_edit_done">수정 완료</string>
     <string name="todo_check">완료로 표시</string>
     <string name="todo_uncheck">완료 해제</string>

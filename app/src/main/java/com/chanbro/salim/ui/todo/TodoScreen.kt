@@ -726,7 +726,7 @@ private fun SubtaskEditLine(
     }
 }
 
-/** 지금 담당자 이름을 보여주고, 탭하면 함께 / 나 / 상대 메뉴를 연다. */
+/** 지금 담당자 이름을 보여주고, 탭하면 우리 / 나 / 상대 메뉴를 연다. */
 @Composable
 private fun AssigneeMenuButton(selected: TodoAssignee, names: SpenderNames, onSelect: (TodoAssignee) -> Unit) {
     var open by remember { mutableStateOf(false) }

@@ -44,7 +44,9 @@ import com.chanbro.salim.core.ui.theme.SalimTheme
 import com.chanbro.salim.core.ui.theme.SalimTokens
 import com.chanbro.salim.domain.model.Connection
 import com.chanbro.salim.domain.model.ScheduleType
+import com.chanbro.salim.domain.model.SpenderNames
 import com.chanbro.salim.ui.connect.ConnectViewModel
+import com.chanbro.salim.ui.common.ChipFlowRow
 import com.chanbro.salim.ui.common.DatePickerModal
 import com.chanbro.salim.ui.common.FieldDivider
 import com.chanbro.salim.ui.common.FieldRow
@@ -77,6 +79,7 @@ fun ScheduleInputScreen(
     val loading by viewModel.loading.collectAsStateWithLifecycle()
     // 미연결이면 모든 일정이 내 개인 일정이라 나눌 것이 없다. (schedule.md 5-2)
     val connection by connectViewModel.connection.collectAsStateWithLifecycle()
+    val names by viewModel.names.collectAsStateWithLifecycle()
 
     // 프리필을 받기 전에는 그리지 않는다 (빈 입력값이 잠깐 보이는 것 방지).
     if (loading) return
@@ -86,6 +89,7 @@ fun ScheduleInputScreen(
         isEdit = scheduleId != null,
         initial = initial,
         connected = connection is Connection.Connected,
+        names = names,
         defaultDateMillis = defaultDateMillis,
         onClose = onClose,
         onSave = { title, dateMillis, minuteOfDay, type ->
@@ -101,6 +105,7 @@ private fun ScheduleInputContent(
     isEdit: Boolean,
     initial: ScheduleInitial?,
     connected: Boolean,
+    names: SpenderNames,
     defaultDateMillis: Long,
     onClose: () -> Unit,
     onSave: (title: String, dateMillis: Long, minuteOfDay: Int?, type: ScheduleType) -> Unit,
@@ -159,7 +164,7 @@ private fun ScheduleInputContent(
                 }
                 if (connected) {
                     FieldDivider()
-                    TypeField(selected = type, onSelect = { type = it })
+                    TypeField(selected = type, names = names, onSelect = { type = it })
                 }
             }
         }
@@ -273,21 +278,18 @@ private fun AllDayToggleRow(checked: Boolean, onCheckedChange: (Boolean) -> Unit
     }
 }
 
+/** 우리 / 내 이름 / 상대 이름 칩. 이름이 길면 다음 줄로 넘긴다. (schedule.md 5-2) */
 @Composable
-private fun TypeField(selected: ScheduleType, onSelect: (ScheduleType) -> Unit) {
+private fun TypeField(selected: ScheduleType, names: SpenderNames, onSelect: (ScheduleType) -> Unit) {
     Column(
         modifier = Modifier.padding(vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text("유형", style = SalimType.bodyMd, color = SalimTokens.TextMuted)
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        ChipFlowRow {
             ScheduleType.entries.forEach { option ->
                 SalimChip(
-                    label = when (option) {
-                        ScheduleType.SHARED -> "우리"
-                        ScheduleType.MINE -> "나"
-                        ScheduleType.PARTNER -> "배우자"
-                    },
+                    label = scheduleTypeLabel(option, names),
                     selected = option == selected,
                     onClick = { onSelect(option) },
                 )
@@ -324,6 +326,7 @@ private fun ScheduleInputAddPreview() {
             isEdit = false,
             initial = null,
             connected = true,
+            names = SpenderNames(),
             defaultDateMillis = todayUtc(),
             onClose = {},
             onSave = { _, _, _, _ -> },
@@ -339,6 +342,7 @@ private fun ScheduleInputEditPreview() {
         ScheduleInputContent(
             isEdit = true,
             connected = true,
+            names = SpenderNames(mine = "해리", partner = "지수"),
             initial = ScheduleInitial("저녁 약속", todayUtc(), 19 * 60, ScheduleType.SHARED),
             defaultDateMillis = todayUtc(),
             onClose = {},

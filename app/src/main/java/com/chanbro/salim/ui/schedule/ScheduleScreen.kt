@@ -39,6 +39,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.chanbro.salim.core.ui.theme.SalimTheme
 import com.chanbro.salim.core.ui.theme.SalimTokens
 import com.chanbro.salim.domain.model.ScheduleType
+import com.chanbro.salim.domain.model.SpenderNames
+import com.chanbro.salim.ui.common.ChipFlowRow
 import com.chanbro.salim.ui.common.MonthPickerSheet
 import com.chanbro.salim.ui.common.MonthSelector
 import com.chanbro.salim.ui.common.SalimCard
@@ -53,13 +55,6 @@ fun scheduleColor(type: ScheduleType): Color = when (type) {
     ScheduleType.SHARED -> SalimTokens.Accent
     ScheduleType.MINE -> SalimTokens.Sage
     ScheduleType.PARTNER -> SalimTokens.Lavender
-}
-
-/** 필터 칩용 짧은 라벨. 리스트 메타에는 type.label(전체 표기)을 쓴다. */
-private fun shortLabel(type: ScheduleType): String = when (type) {
-    ScheduleType.SHARED -> "우리"
-    ScheduleType.MINE -> "나"
-    ScheduleType.PARTNER -> "배우자"
 }
 
 private val WEEKDAYS = listOf("일", "월", "화", "수", "목", "금", "토")
@@ -113,7 +108,10 @@ private fun ScheduleContent(
                 label = "${state.year}년 ${state.month}월",
                 onClick = { showMonthPicker = true },
             )
-            FilterChips(active = state.activeFilters, onToggle = onToggleFilter)
+            // 미연결이면 모든 일정이 내 개인 일정이라 나눌 것이 없다. (schedule.md 5-1)
+            if (state.connected) {
+                FilterChips(active = state.activeFilters, names = state.names, onToggle = onToggleFilter)
+            }
             CalendarCard(
                 weeks = state.weeks,
                 selectedDateMillis = state.selectedDateMillis,
@@ -156,13 +154,13 @@ private fun ScheduleTopBar() {
     }
 }
 
-/** 유형 필터 (복수 선택). 전부 끄면 빈 화면이라 마지막 하나는 꺼지지 않는다. */
+/** 유형 필터 (복수 선택). 전부 끄면 빈 화면이라 마지막 하나는 꺼지지 않는다. 이름이 길면 다음 줄로 넘긴다. */
 @Composable
-private fun FilterChips(active: Set<ScheduleType>, onToggle: (ScheduleType) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+private fun FilterChips(active: Set<ScheduleType>, names: SpenderNames, onToggle: (ScheduleType) -> Unit) {
+    ChipFlowRow {
         ScheduleType.entries.forEach { type ->
             SalimChip(
-                label = shortLabel(type),
+                label = scheduleTypeLabel(type, names),
                 selected = type in active,
                 onClick = { onToggle(type) },
             )
@@ -332,8 +330,10 @@ private fun ScheduleScreenPreview() {
                 selectedDayHeader = "8월 5일 (수)",
                 selectedDayRows = listOf(
                     ScheduleRowUi("1", "저녁 약속", "오후 7:00 · 우리 일정", ScheduleType.SHARED),
-                    ScheduleRowUi("2", "치과", "종일 · 개인(나)", ScheduleType.MINE),
+                    ScheduleRowUi("2", "치과", "종일 · 개인(해리)", ScheduleType.MINE),
                 ),
+                connected = true,
+                names = SpenderNames(mine = "해리", partner = "지수"),
             ),
             onItemClick = {},
             onSelectMonth = { _, _ -> },

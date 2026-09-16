@@ -139,7 +139,7 @@ private fun ExpenseInputContent(
     modifier: Modifier = Modifier,
 ) {
     var amountDigits by rememberSaveable { mutableStateOf(initial?.amount?.toString().orEmpty()) }
-    // 미연결이면 모든 지출이 본인 것이라 지출자를 고를 이유가 없다. (expense.md 4-2)
+    // 기본은 본인 ("우리"는 골라야 한다). 미연결이면 모든 지출이 본인 것이라 지출자를 고를 이유가 없다. (expense.md 4-2)
     var spender by rememberSaveable { mutableStateOf(initial?.spender ?: Spender.ME) }
     // 선택은 id로 들고 있는다 — 카테고리 수정에서 이름이나 고정/더보기 자리가 바뀌어도 선택이 유지된다.
     var categoryId by rememberSaveable { mutableStateOf(initial?.categoryId) }
@@ -316,12 +316,14 @@ private fun AmountInput(digits: String, onDigitsChange: (String) -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 16.dp, bottom = 8.dp),
-        horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // 입력칸이 남는 폭을 쓰고 숫자는 "원" 앞에 오른쪽 정렬한다. BasicTextField는 기본 최소 폭(10글자)이 있어
+        // 폭을 정해 주지 않으면 이 줄을 거의 다 차지하고, "원"이 화면 끝에 붙거나 좁은 화면에서 잘린다.
         BasicTextField(
             value = digits,
             onValueChange = onDigitsChange,
+            modifier = Modifier.weight(1f),
             textStyle = amountStyle.copy(color = SalimTokens.TextPrimary, textAlign = TextAlign.End),
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -336,11 +338,17 @@ private fun AmountInput(digits: String, onDigitsChange: (String) -> Unit) {
                 }
             },
         )
-        Text("원", style = amountStyle, color = SalimTokens.TextPrimary)
+        // "원" 뒤 여백 — 아래 카드 안쪽 값(날짜·시간)의 오른쪽 끝과 맞춘다. (expense.md 4-2)
+        Text(
+            "원",
+            style = amountStyle,
+            color = SalimTokens.TextPrimary,
+            modifier = Modifier.padding(end = 20.dp),
+        )
     }
 }
 
-/** 칩 라벨은 설정 > 프로필의 이름과 상대 이름을 쓴다. 이름이 없으면 "나"/"배우자". */
+/** 우리 / 내 이름 / 상대 이름 칩. 이름은 설정 > 프로필의 이름과 상대 이름을 쓰고, 없으면 "나"/"배우자". 길면 다음 줄로 넘긴다. */
 @Composable
 private fun SpenderField(
     names: SpenderNames,
@@ -352,7 +360,7 @@ private fun SpenderField(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text("지출자", style = SalimType.bodyMd, color = SalimTokens.TextMuted)
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        ChipFlowRow {
             Spender.entries.forEach { option ->
                 SalimChip(
                     label = names.labelOf(option),

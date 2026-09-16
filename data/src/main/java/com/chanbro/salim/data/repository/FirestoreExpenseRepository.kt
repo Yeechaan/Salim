@@ -82,18 +82,23 @@ class FirestoreExpenseRepository @Inject constructor(
         collection(userScope.requireScope().doc).document(id).delete().await()
     }
 
-    private fun Expense.toData(scope: DataScope): Map<String, Any?> = mapOf(
-        "amount" to amount,
-        "spentAtMillis" to spentAtMillis,
-        // 지출자는 uid로 저장한다. "나/배우자"는 보는 사람에 따라 뒤집히는 값이라
-        // 공동 경로에 그대로 넣으면 상대가 반대로 읽는다. (firestore-schema.md)
-        "spenderId" to scope.spenderUid(spender),
-        // 표시는 categoryId로 지금 이름을 찾는다. categoryName은 카테고리를 못 찾을 때의 대비용.
-        "categoryId" to categoryId,
-        "categoryName" to categoryName,
-        "memo" to memo,
-        "createdAtMillis" to createdAtMillis,
-    )
+    private fun Expense.toData(scope: DataScope): Map<String, Any?> {
+        val spenderUid = scope.spenderUid(spender)
+        return mapOf(
+            "amount" to amount,
+            "spentAtMillis" to spentAtMillis,
+            // 지출자는 uid로 저장한다. "나/배우자"는 보는 사람에 따라 뒤집히는 값이라
+            // 공동 경로에 그대로 넣으면 상대가 반대로 읽는다. (firestore-schema.md)
+            // "우리"는 가리킬 한 사람이 없어 uid 없이 유형으로만 남긴다.
+            "spenderType" to if (spenderUid == null) SPENDER_SHARED else SPENDER_PERSONAL,
+            "spenderId" to spenderUid,
+            // 표시는 categoryId로 지금 이름을 찾는다. categoryName은 카테고리를 못 찾을 때의 대비용.
+            "categoryId" to categoryId,
+            "categoryName" to categoryName,
+            "memo" to memo,
+            "createdAtMillis" to createdAtMillis,
+        )
+    }
 
     private fun collection(scopeDoc: DocumentReference): CollectionReference =
         scopeDoc.collection("expenses")
@@ -110,10 +115,12 @@ class FirestoreExpenseRepository @Inject constructor(
     )
 
     /**
+     * "우리"는 uid가 없어 spenderType으로만 알 수 있으므로 먼저 본다.
      * spenderId가 없으면 연결 이전에 개인 경로로 쌓인 문서다. 그때의 `spender` 필드로
      * 폴백한다 — 개인 데이터는 본인만 열람하므로 폴백 결과가 항상 맞다.
      */
     private fun DocumentSnapshot.readSpender(myUid: String): Spender {
+        if (getString("spenderType") == SPENDER_SHARED) return Spender.SHARED
         getString("spenderId")?.let { return if (it == myUid) Spender.ME else Spender.PARTNER }
         return if (getString("spender") == Spender.PARTNER.name) Spender.PARTNER else Spender.ME
     }
@@ -123,8 +130,20 @@ class FirestoreExpenseRepository @Inject constructor(
             clear()
             set(year, month - 1, 1)
         }.timeInMillis
+
+    private companion object {
+        const val SPENDER_SHARED = "SHARED"
+        const val SPENDER_PERSONAL = "PERSONAL"
+    }
 }
 
-/** 미연결 상태에서는 배우자를 고를 수 없으므로 언제나 본인으로 떨어진다. */
-internal fun DataScope.spenderUid(spender: Spender): String =
-    if (spender == Spender.PARTNER) partnerUid ?: myUid else myUid
+/**
+ * 저장할 지출자 uid. "우리"는 한 사람이 아니라서 null.
+ * 미연결 상태에서는 배우자·우리를 고를 수 없으므로 언제나 본인으로 떨어진다.
+ */
+internal fun DataScope.spenderUid(spender: Spender): String? = when {
+    partnerUid == null -> myUid
+    spender == Spender.SHARED -> null
+    spender == Spender.PARTNER -> partnerUid
+    else -> myUid
+}

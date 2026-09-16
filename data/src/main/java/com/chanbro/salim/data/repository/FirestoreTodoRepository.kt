@@ -103,7 +103,7 @@ class FirestoreTodoRepository @Inject constructor(
 
     /**
      * 지출자·일정 주인과 같은 이유로 "나/상대" 대신 SHARED 또는 PERSONAL + 담당자 uid로 저장한다.
-     * @param deleteOwner 수정일 때 "함께"로 바꾸면 남아 있던 ownerId를 지운다.
+     * @param deleteOwner 수정일 때 "우리"로 바꾸면 남아 있던 ownerId를 지운다.
      */
     private fun assigneeFields(scope: DataScope, assignee: TodoAssignee, deleteOwner: Boolean): Map<String, Any?> =
         when (assignee) {
