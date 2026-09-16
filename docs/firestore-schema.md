@@ -55,7 +55,8 @@
 |---|---|---|---|
 | amount | Long | ✅ | 금액 (원 단위 정수) |
 | spentAtMillis | Long | ✅ | 지출 일시 (UTC millis, 날짜+시간 합산). **날짜별 그룹 헤더**의 소스 |
-| spenderId | String (uid) | ➕ | 지출자의 uid |
+| spenderType | String | ✅ | `PERSONAL`(한 사람 — `spenderId`) / `SHARED`(우리 — 둘이 함께 쓴 지출). 이 필드가 없는 예전 문서는 PERSONAL로 읽는다 |
+| spenderId | String (uid)? | ➕ | 지출자의 uid. `SHARED`면 null |
 | createdAtMillis | Long | ✅ | 등록 시각. **전체보기 정렬 = 입력 시간순**(PRD 4)의 정렬 키 |
 | categoryName | String | ✅ | 저장 시점의 카테고리명. `categoryId`가 없거나 카테고리를 찾지 못할 때만 표시에 쓴다 |
 | memo | String? | ✅ | 메모 |
@@ -72,8 +73,11 @@
 지금 코드는 `spender` 필드에 `"ME"` / `"PARTNER"`라는 **보는 사람 기준 상대값**을 저장한다. 개인 경로에서는 문제가 없지만 공동 경로에서는 깨진다 — A가 저장한 `"ME"`를 B가 읽으면 "나"로 보인다.
 
 - 저장은 `spenderId`(uid), 표시는 상대적으로: 읽을 때 `spenderId == 내 uid ? 나 : 배우자`.
-- 도메인 모델의 `Spender` enum(`ME`/`PARTNER`)은 그대로 둔다. UI는 손대지 않고 Repository가 uid ↔ enum 매핑을 담당한다.
+- 도메인 모델의 `Spender` enum(`ME`/`PARTNER`, "우리"용 `SHARED`는 아래)은 그대로 둔다. UI는 손대지 않고 Repository가 uid ↔ enum 매핑을 담당한다.
 - **하위호환**: 기존 개인 경로 문서에는 `spenderId`가 없다. 없으면 예전 `spender` 필드로 폴백한다. 개인 데이터는 본인만 열람하므로 폴백 결과가 항상 옳고, 마이그레이션이 필요 없다.
+- **"우리"(공동 지출, PRD 4)는 한 사람의 uid로 나타낼 수 없어 `spenderType: SHARED` + `spenderId: null`로 저장한다.** 할 일 담당자(`assignee` + `ownerId`)와 같은 모양이다. 읽을 때는 `spenderType`을 먼저 보고, SHARED가 아니면 위 규칙대로 `spenderId`(없으면 예전 `spender`)로 가른다. 도메인에서는 `Spender.SHARED`.
+  - 미연결(개인 경로)에서는 "우리"를 고를 수 없으므로 저장소가 본인(PERSONAL)으로 떨어뜨린다 — 배우자와 같은 처리.
+  - 필드 추가라 마이그레이션은 필요 없다. 다만 이 필드를 모르는 구버전 앱은 "우리" 지출을 "나"로 보여준다(`spenderId`도 예전 `spender`도 없어서) — 두 사람 모두 앱을 업데이트해야 제대로 보인다.
 
 **정렬/그룹**: 리스트 정렬 키는 `createdAtMillis`, 날짜 그룹 헤더는 `spentAtMillis`. (두 값을 분리 저장하는 이유 — 지출 발생일과 입력 순서가 다를 수 있음)
 
@@ -84,7 +88,7 @@
 | 월 전체보기 (현재 구현) | `where spentAtMillis >= ? < ? orderBy spentAtMillis desc` | 단일 필드(자동) |
 | 월 전체보기 (yearMonth 도입 후) | `where yearMonth == ? orderBy createdAtMillis desc` | (yearMonth, createdAtMillis) |
 | + 카테고리 필터 | `where yearMonth == ? where categoryId == ? orderBy createdAtMillis desc` | (yearMonth, categoryId, createdAtMillis) |
-| + 지출자 필터 | `where yearMonth == ? where spenderId == ? orderBy createdAtMillis desc` | (yearMonth, spenderId, createdAtMillis) |
+| + 지출자 필터 | `where yearMonth == ? where spenderId == ? orderBy createdAtMillis desc` ("우리"는 `spenderType == SHARED`) | (yearMonth, spenderId, createdAtMillis) / (yearMonth, spenderType, createdAtMillis) |
 
 - **1차 구현(현재)**: 기간(선택한 달 안의 날짜 범위)·카테고리·지출자 필터와 메모 검색은 모두 **이미 구독 중인 월 조회 결과를 클라이언트에서 거른다**. 스코프가 한 달이라 문서 수가 적고, 쿼리를 새로 걸지 않으니 추가 읽기 비용·복합 인덱스·스키마 변경이 없다. 위 표의 필터 쿼리와 `yearMonth`는 여러 달 조회 등으로 서버 쿼리가 필요해질 때 도입한다.
   - 카테고리 필터는 `categoryId`로 비교하되, id 없는 예전 지출은 이름으로 카테고리를 찾아 비교한다 (수정 화면 프리필과 같은 규칙).
@@ -143,7 +147,7 @@
 | 필드 | 타입 | 설명 |
 |---|---|---|
 | title | String | 제목 (최대 30자) |
-| assignee | String | `SHARED`(함께) / `PERSONAL`(한 사람) |
+| assignee | String | `SHARED`(우리) / `PERSONAL`(한 사람) |
 | ownerId | String (uid)? | `PERSONAL`일 때 담당자 uid. `SHARED`면 없음 |
 | parentId | String? | 하위 항목이면 상위 할 일의 문서 id. 상위 항목은 없음(null) |
 | done | Boolean | 완료 여부 |
