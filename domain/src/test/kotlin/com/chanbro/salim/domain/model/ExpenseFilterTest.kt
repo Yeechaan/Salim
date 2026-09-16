@@ -81,6 +81,17 @@ class ExpenseFilterTest {
     }
 
     @Test
+    fun `우리는 따로 고르는 지출자라 나를 골라도 우리 지출은 빠진다`() {
+        val mineOnly = ExpenseFilter(spenders = setOf(Spender.ME))
+        val mineAndShared = ExpenseFilter(spenders = setOf(Spender.ME, Spender.SHARED))
+
+        assertFalse(mineOnly.matches(expense(spender = Spender.SHARED), categories))
+        assertTrue(mineAndShared.matches(expense(spender = Spender.SHARED), categories))
+        assertTrue(mineAndShared.matches(expense(spender = Spender.ME), categories))
+        assertFalse(mineAndShared.matches(expense(spender = Spender.PARTNER), categories))
+    }
+
+    @Test
     fun `조건을 모두 함께 만족해야 통과한다`() {
         val filter = ExpenseFilter(query = "점심", categoryIds = setOf("food"), spenders = setOf(Spender.ME))
 

@@ -12,9 +12,12 @@ data class Schedule(
     val isAllDay: Boolean get() = minuteOfDay == null
 }
 
-/** 일정 유형. (PRD 5: 우리 일정 / 개인(나, 상대방)) */
-enum class ScheduleType(val label: String) {
-    SHARED("우리 일정"),
-    MINE("개인(나)"),
-    PARTNER("개인(배우자)"),
+/**
+ * 일정 유형. (PRD 5: 우리 일정 / 개인(나, 상대방))
+ * 표시 라벨은 화면에서 붙인다 — 개인 일정은 설정 > 프로필 이름으로 불러서 모델에 고정 문구를 둘 수 없다.
+ */
+enum class ScheduleType {
+    SHARED,
+    MINE,
+    PARTNER,
 }

@@ -13,8 +13,13 @@ data class Expense(
     val categoryId: String? = null,
 )
 
-/** 지출자: 나 / 배우자. 미연결 상태에서는 항상 ME. */
+/**
+ * 지출자: 우리 / 나 / 배우자. 미연결 상태에서는 항상 ME.
+ * 순서가 칩 순서다 — 할 일 담당자·일정 유형처럼 "우리"를 맨 앞에 둔다. (PRD 4)
+ */
 enum class Spender(val label: String) {
+    /** 둘이 함께 쓴 지출. 한 사람으로 가르지 않는다. */
+    SHARED("우리"),
     ME("나"),
     PARTNER("배우자"),
 }

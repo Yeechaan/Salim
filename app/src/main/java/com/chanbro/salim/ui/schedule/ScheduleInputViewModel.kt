@@ -4,13 +4,17 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.chanbro.salim.domain.model.Schedule
 import com.chanbro.salim.domain.model.ScheduleType
+import com.chanbro.salim.domain.model.SpenderNames
 import com.chanbro.salim.domain.usecase.DeleteScheduleUseCase
 import com.chanbro.salim.domain.usecase.GetScheduleUseCase
+import com.chanbro.salim.domain.usecase.ObserveSpenderNamesUseCase
 import com.chanbro.salim.domain.usecase.SaveScheduleUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
@@ -28,7 +32,15 @@ class ScheduleInputViewModel @Inject constructor(
     private val getSchedule: GetScheduleUseCase,
     private val saveSchedule: SaveScheduleUseCase,
     private val deleteSchedule: DeleteScheduleUseCase,
+    observeSpenderNames: ObserveSpenderNamesUseCase,
 ) : ViewModel() {
+
+    /** 유형 칩에 쓸 이름. 프로필을 비워 두면 "나"/"배우자"로 떨어진다. (schedule.md 5-2) */
+    val names: StateFlow<SpenderNames> = observeSpenderNames().stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = SpenderNames(),
+    )
 
     private val _initial = MutableStateFlow<ScheduleInitial?>(null)
     val initial: StateFlow<ScheduleInitial?> = _initial.asStateFlow()
