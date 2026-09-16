@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Salim</string>
+    <string name="app_name">같이살림</string>
 
     <!-- 온보딩 (docs/wireframe/onboarding.md 1-1, 1-2) -->
     <string name="onboarding_1_title">둘이 함께 쓰는 가계부</string>
