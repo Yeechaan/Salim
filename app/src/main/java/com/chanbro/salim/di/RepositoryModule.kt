@@ -12,6 +12,7 @@ import com.chanbro.salim.data.repository.FirestoreExpenseRepository
 import com.chanbro.salim.data.repository.FirestoreProfileRepository
 import com.chanbro.salim.data.repository.FirestoreScheduleRepository
 import com.chanbro.salim.data.repository.FirestoreTodoRepository
+import com.chanbro.salim.data.repository.FirestoreWeddingRepository
 import com.chanbro.salim.domain.repository.AuthRepository
 import com.chanbro.salim.domain.repository.BudgetRepository
 import com.chanbro.salim.domain.repository.CategoryRepository
@@ -22,6 +23,7 @@ import com.chanbro.salim.domain.repository.OnboardingRepository
 import com.chanbro.salim.domain.repository.ProfileRepository
 import com.chanbro.salim.domain.repository.ScheduleRepository
 import com.chanbro.salim.domain.repository.TodoRepository
+import com.chanbro.salim.domain.repository.WeddingRepository
 import com.chanbro.salim.domain.repository.WidgetSettingsRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -72,6 +74,10 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindCategoryRepository(impl: FirestoreCategoryRepository): CategoryRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindWeddingRepository(impl: FirestoreWeddingRepository): WeddingRepository
 
     companion object {
         @Provides

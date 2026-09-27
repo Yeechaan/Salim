@@ -1,7 +1,6 @@
 package com.chanbro.salim.ui.todo
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,13 +14,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -75,6 +72,7 @@ import com.chanbro.salim.domain.model.Todo
 import com.chanbro.salim.domain.model.TodoAssignee
 import com.chanbro.salim.domain.model.TodoItem
 import com.chanbro.salim.domain.model.TodoSections
+import com.chanbro.salim.ui.common.CheckCircleButton
 import com.chanbro.salim.ui.common.SalimCard
 import com.chanbro.salim.ui.common.SalimChip
 import com.chanbro.salim.ui.common.SalimTab
@@ -313,7 +311,7 @@ private fun TodoRow(item: TodoItem, expanded: Boolean, actions: TodoRowActions) 
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // 체크박스는 줄 탭(수정)과 따로 눌린다.
-        CheckButton(checked = todo.done, size = 24.dp, onClick = { actions.onToggle(item, !todo.done) })
+        CheckCircleButton(checked = todo.done, size = 24.dp, onClick = { actions.onToggle(item, !todo.done) })
         TodoTexts(todo.title, todo.done, meta, Modifier.weight(1f), SalimType.bodyLg)
         if (item.subtasks.isNotEmpty()) {
             IconButton(onClick = { actions.onExpandToggle(todo.id) }) {
@@ -340,7 +338,7 @@ private fun SubtaskRow(subtask: Todo, assigneeLabel: String?, onToggle: () -> Un
         horizontalArrangement = Arrangement.spacedBy(2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        CheckButton(checked = subtask.done, size = 20.dp, onClick = onToggle)
+        CheckCircleButton(checked = subtask.done, size = 20.dp, onClick = onToggle)
         TodoTexts(subtask.title, subtask.done, assigneeLabel, Modifier.weight(1f), SalimType.bodyMd)
     }
 }
@@ -368,36 +366,6 @@ private fun TodoTexts(
         )
         if (meta != null) {
             Text(meta, style = SalimType.bodySm, color = SalimTokens.TextMuted)
-        }
-    }
-}
-
-@Composable
-private fun CheckButton(checked: Boolean, size: Dp, onClick: () -> Unit) {
-    val label = stringResource(if (checked) R.string.todo_uncheck else R.string.todo_check)
-    IconButton(onClick = onClick, modifier = Modifier.semantics { contentDescription = label }) {
-        TodoCheckbox(checked = checked, size = size)
-    }
-}
-
-/** 원형 체크. 완료 시 Coral 채움 + 흰 체크. (design.md 리스트 아이템 - 할 일) */
-@Composable
-private fun TodoCheckbox(checked: Boolean, size: Dp) {
-    Box(
-        modifier = Modifier
-            .size(size)
-            .clip(CircleShape)
-            .then(
-                if (checked) {
-                    Modifier.background(SalimTokens.Accent)
-                } else {
-                    Modifier.border(2.dp, SalimTokens.TextMuted.copy(alpha = 0.6f), CircleShape)
-                },
-            ),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (checked) {
-            Icon(Icons.Filled.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(size * 0.66f))
         }
     }
 }

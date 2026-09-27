@@ -50,11 +50,20 @@ private const val MAX_AMOUNT = 9_999_999_999L
  * 월 예산 설정 바텀시트 — 홈 예산 카드 / 설정 > 달별 예산 공용 (PRD 3. 홈, 7. 설정).
  * 키패드 직접 입력 + 만원 단위 빠른 금액 버튼(누적)을 함께 제공한다.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BudgetInputSheet(
     year: Int,
     month: Int,
+    initialAmount: Long?,
+    onDismiss: () -> Unit,
+    onConfirm: (Long) -> Unit,
+) = BudgetInputSheet("${year}년 ${month}월 예산", initialAmount, onDismiss, onConfirm)
+
+/** 제목만 바꿔 쓰는 예산 시트. 결혼 준비의 "웨딩 예산"이 같은 시트를 쓴다. (wedding.md 12-4) */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun BudgetInputSheet(
+    title: String,
     initialAmount: Long?,
     onDismiss: () -> Unit,
     onConfirm: (Long) -> Unit,
@@ -77,7 +86,7 @@ fun BudgetInputSheet(
                 .padding(bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
-            Text("${year}년 ${month}월 예산", style = SalimType.titleLg, color = SalimTokens.TextPrimary)
+            Text(title, style = SalimType.titleLg, color = SalimTokens.TextPrimary)
 
             Row(
                 modifier = Modifier.fillMaxWidth(),

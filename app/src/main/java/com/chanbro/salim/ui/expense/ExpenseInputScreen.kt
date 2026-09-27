@@ -12,8 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -36,13 +34,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.chanbro.salim.R
@@ -61,8 +55,9 @@ import com.chanbro.salim.ui.common.TimePickerModal
 import com.chanbro.salim.ui.common.SalimChip
 import com.chanbro.salim.ui.common.SalimType
 import com.chanbro.salim.ui.common.SaveButton
+import com.chanbro.salim.ui.common.AmountInput
+import com.chanbro.salim.ui.common.TextInputField
 import com.chanbro.salim.ui.common.formatDate
-import com.chanbro.salim.ui.common.ThousandsTransformation
 import com.chanbro.salim.ui.common.todayUtcMillis
 import java.util.Calendar
 
@@ -197,7 +192,7 @@ private fun ExpenseInputContent(
                     onMoreClick = { showCategoryMore = true },
                 )
                 FieldDivider()
-                MemoField(memo = memo, onMemoChange = { memo = it })
+                TextInputField(label = "메모", value = memo, onValueChange = { memo = it }, hint = "메모 입력")
             }
         }
 
@@ -307,45 +302,6 @@ private fun DeleteConfirmDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
         },
         containerColor = SalimTokens.CardSurface,
     )
-}
-
-@Composable
-private fun AmountInput(digits: String, onDigitsChange: (String) -> Unit) {
-    val amountStyle = SalimType.display.copy(fontSize = 40.sp, lineHeight = 48.sp)
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 16.dp, bottom = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        // 입력칸이 남는 폭을 쓰고 숫자는 "원" 앞에 오른쪽 정렬한다. BasicTextField는 기본 최소 폭(10글자)이 있어
-        // 폭을 정해 주지 않으면 이 줄을 거의 다 차지하고, "원"이 화면 끝에 붙거나 좁은 화면에서 잘린다.
-        BasicTextField(
-            value = digits,
-            onValueChange = onDigitsChange,
-            modifier = Modifier.weight(1f),
-            textStyle = amountStyle.copy(color = SalimTokens.TextPrimary, textAlign = TextAlign.End),
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            cursorBrush = SolidColor(SalimTokens.Accent),
-            visualTransformation = ThousandsTransformation,
-            decorationBox = { inner ->
-                Box(contentAlignment = Alignment.CenterEnd) {
-                    if (digits.isEmpty()) {
-                        Text("0", style = amountStyle, color = SalimTokens.TextMuted)
-                    }
-                    inner()
-                }
-            },
-        )
-        // "원" 뒤 여백 — 아래 카드 안쪽 값(날짜·시간)의 오른쪽 끝과 맞춘다. (expense.md 4-2)
-        Text(
-            "원",
-            style = amountStyle,
-            color = SalimTokens.TextPrimary,
-            modifier = Modifier.padding(end = 20.dp),
-        )
-    }
 }
 
 /** 우리 / 내 이름 / 상대 이름 칩. 이름은 설정 > 프로필의 이름과 상대 이름을 쓰고, 없으면 "나"/"배우자". 길면 다음 줄로 넘긴다. */
@@ -476,30 +432,6 @@ private fun CategoryMoreSheet(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun MemoField(memo: String, onMemoChange: (String) -> Unit) {
-    Column(
-        modifier = Modifier.padding(vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text("메모", style = SalimType.bodyMd, color = SalimTokens.TextMuted)
-        BasicTextField(
-            value = memo,
-            onValueChange = onMemoChange,
-            textStyle = SalimType.bodyLg.copy(color = SalimTokens.TextPrimary),
-            singleLine = true,
-            cursorBrush = SolidColor(SalimTokens.Accent),
-            modifier = Modifier.fillMaxWidth(),
-            decorationBox = { inner ->
-                if (memo.isEmpty()) {
-                    Text("메모 입력", style = SalimType.bodyLg, color = SalimTokens.TextMuted)
-                }
-                inner()
-            },
-        )
     }
 }
 
