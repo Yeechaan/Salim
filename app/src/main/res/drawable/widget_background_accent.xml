@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 디데이 위젯 당일(D-DAY) 강조 배경 — Coral (SalimTokens.Accent). widget.md 10-1 "당일" -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="#FFE8896B" />
+    <corners android:radius="24dp" />
+</shape>

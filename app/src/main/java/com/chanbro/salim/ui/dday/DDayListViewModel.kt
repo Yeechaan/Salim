@@ -70,6 +70,9 @@ private fun autoDDay(id: String, title: String, dateMillis: Long) = DDay(
     createdAtMillis = 0L,
 )
 
+/** 이미 지난 항목을 뺀 다가오는 디데이. 홈 카드(home.md 4)와 홈 화면 위젯(PRD 10)이 같은 기준을 쓴다. */
+internal fun List<DDayRowUi>.upcoming(): List<DDayRowUi> = filterNot { it.dDayText.startsWith("D+") }
+
 /**
  * 가까운 순 정렬 (PRD 6.). 다가올 날짜를 남은 일수 오름차순으로 먼저 놓고,
  * 이미 지난 1회성 항목은 최근에 지난 것부터 뒤에 붙인다.

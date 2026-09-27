@@ -20,8 +20,6 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -33,7 +31,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -45,6 +42,7 @@ import com.chanbro.salim.ui.common.DatePickerModal
 import com.chanbro.salim.ui.common.FieldDivider
 import com.chanbro.salim.ui.common.FieldRow
 import com.chanbro.salim.ui.common.SalimCard
+import com.chanbro.salim.ui.common.SalimSwitch
 import com.chanbro.salim.ui.common.SalimType
 import com.chanbro.salim.ui.common.SaveButton
 import com.chanbro.salim.ui.common.formatDate
@@ -219,17 +217,7 @@ private fun RepeatToggleRow(checked: Boolean, onCheckedChange: (Boolean) -> Unit
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text("매년 반복", style = SalimType.bodyMd, color = SalimTokens.TextMuted)
-        Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = Color.White,
-                checkedTrackColor = SalimTokens.Accent,
-                uncheckedThumbColor = Color.White,
-                uncheckedTrackColor = SalimTokens.ProgressTrack,
-                uncheckedBorderColor = SalimTokens.ProgressTrack,
-            ),
-        )
+        SalimSwitch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 

@@ -25,9 +25,10 @@ class FirestoreBudgetRepository @Inject constructor(
     private val userScope: UserScope,
 ) : BudgetRepository {
 
+    // settledScope — 판정 전 "예산 없음"을 흘리지 않는다. 위젯이 첫 값만 읽고 그리기 때문 (PRD 10).
     @OptIn(ExperimentalCoroutinesApi::class)
     override fun observe(year: Int, month: Int): Flow<Budget?> =
-        userScope.scope.flatMapLatest { scope ->
+        userScope.settledScope.flatMapLatest { scope ->
             if (scope == null) return@flatMapLatest flowOf(null)
             callbackFlow {
                 val listener = document(scope.doc, year, month)

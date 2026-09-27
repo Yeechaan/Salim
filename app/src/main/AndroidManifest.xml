@@ -34,6 +34,44 @@
                 <data android:scheme="salim" android:host="invite" />
             </intent-filter>
         </activity>
+
+        <!-- 홈 화면 위젯 (PRD 10) -->
+        <receiver
+            android:name=".widget.DDayWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_dday_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/dday_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.BudgetWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_budget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/budget_widget_info" />
+        </receiver>
+
+        <!-- 자정 알람 + 날짜가 바뀌는 시스템 이벤트로 모든 위젯을 다시 그린다.
+             TIME_SET / TIMEZONE_CHANGED는 시스템이 보내므로 exported=false여도 받는다. -->
+        <receiver
+            android:name=".widget.WidgetRefreshReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

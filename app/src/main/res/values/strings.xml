@@ -122,6 +122,22 @@
     <string name="dday_empty">디데이를 추가해보세요</string>
     <string name="settings_dday_manage">디데이 관리</string>
 
+    <!-- 홈 화면 위젯 (PRD 10, docs/wireframe/widget.md) -->
+    <string name="widget_unavailable">앱을 열어 확인해주세요</string>
+    <string name="widget_dday_label">디데이</string>
+    <string name="widget_dday_description">가장 가까운 디데이를 홈 화면에서 확인해요</string>
+    <string name="widget_dday_today">오늘은 %1$s</string>
+    <string name="widget_budget_label">예산</string>
+    <string name="widget_budget_description">이번 달 남은 예산을 홈 화면에서 확인해요</string>
+    <string name="widget_budget_title">%1$d월 예산</string>
+    <string name="widget_budget_remain">남음</string>
+    <string name="widget_budget_over">초과</string>
+    <string name="widget_budget_used">사용</string>
+    <string name="widget_budget_percent">%1$d%%</string>
+    <string name="widget_budget_used_percent">%1$d%% 사용</string>
+    <string name="widget_budget_empty">이번 달 예산을 설정해보세요</string>
+    <string name="settings_widget_show_amount">위젯에 금액 표시</string>
+
     <!-- 가계부 전체보기 · 검색/필터 (docs/wireframe/expense.md 4-1) -->
     <string name="expense_title">가계부</string>
     <string name="expense_month_label">%1$d년 %2$d월</string>

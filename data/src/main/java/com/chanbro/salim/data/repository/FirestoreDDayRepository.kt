@@ -28,8 +28,9 @@ class FirestoreDDayRepository @Inject constructor(
     private val userScope: UserScope,
 ) : DDayRepository {
 
+    // settledScope — 판정 전 빈 목록을 흘리지 않는다. 위젯이 첫 값만 읽고 그리기 때문 (PRD 10).
     @OptIn(ExperimentalCoroutinesApi::class)
-    override fun observeAll(): Flow<List<DDay>> = userScope.scope.flatMapLatest { scope ->
+    override fun observeAll(): Flow<List<DDay>> = userScope.settledScope.flatMapLatest { scope ->
         if (scope == null) return@flatMapLatest flowOf(emptyList())
         callbackFlow {
             // 정렬은 표시 시점에 남은 일수로 계산하므로 여기서는 orderBy를 걸지 않는다

@@ -2,6 +2,7 @@ package com.chanbro.salim.ui.settings
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,6 +31,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -42,6 +44,7 @@ import com.chanbro.salim.core.ui.theme.SalimTokens
 import com.chanbro.salim.domain.model.Connection
 import com.chanbro.salim.ui.common.BudgetInputSheet
 import com.chanbro.salim.ui.common.SalimCard
+import com.chanbro.salim.ui.common.SalimSwitch
 import com.chanbro.salim.ui.common.SalimType
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -76,6 +79,7 @@ fun SettingsScreen(
         onDDayClick = onDDayClick,
         onConnectClick = onConnectClick,
         onBudgetClick = { showBudgetSheet = true },
+        onWidgetShowAmountChange = viewModel::onWidgetShowAmountChange,
         onSignOutClick = { confirmingSignOut = true },
     )
 
@@ -112,6 +116,7 @@ private fun SettingsContent(
     onDDayClick: () -> Unit,
     onConnectClick: () -> Unit,
     onBudgetClick: () -> Unit,
+    onWidgetShowAmountChange: (Boolean) -> Unit,
     onSignOutClick: () -> Unit,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
@@ -155,6 +160,13 @@ private fun SettingsContent(
                     label = "알림 설정",
                     value = "준비 중",
                     enabled = false,
+                )
+                RowDivider()
+                // 끄면 예산 위젯이 금액 없이 사용률만 보여준다 (PRD 10-2). 이 기기에만 적용
+                SettingsToggleRow(
+                    label = stringResource(R.string.settings_widget_show_amount),
+                    checked = state.widgetShowAmount,
+                    onCheckedChange = onWidgetShowAmountChange,
                 )
             }
 
@@ -339,6 +351,27 @@ private fun SettingsRow(
     }
 }
 
+/** 우측 토글 줄. 줄 전체를 눌러도 토글된다. */
+@Composable
+private fun SettingsToggleRow(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = SalimType.bodyLg, color = SalimTokens.TextPrimary)
+        // 줄이 토글을 맡으므로 스위치 자체는 입력을 받지 않는다 (접근성 중복 방지)
+        SalimSwitch(checked = checked, onCheckedChange = null)
+    }
+}
+
 @Composable
 private fun RowDivider() {
     Box(
@@ -366,6 +399,7 @@ private fun SettingsScreenPreview() {
             onDDayClick = {},
             onConnectClick = {},
             onBudgetClick = {},
+            onWidgetShowAmountChange = {},
             onSignOutClick = {},
         )
     }
