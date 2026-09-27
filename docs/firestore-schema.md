@@ -8,8 +8,8 @@
 
 | 상태 | 경로(SSOT) |
 |---|---|
-| 미연결 | `users/{userId}/{expenses,schedules,todos,ddays,categories,budget}` |
-| 연결 | `couples/{coupleId}/{expenses,schedules,todos,ddays,categories,budget}` |
+| 미연결 | `users/{userId}/{expenses,schedules,todos,ddays,categories,budget,wedding,weddingTasks,weddingExpenses,weddingVendors}` |
+| 연결 | `couples/{coupleId}/{expenses,schedules,todos,ddays,categories,budget,wedding,weddingTasks,weddingExpenses,weddingVendors}` |
 
 - 경로 선택은 `data/repository/UserScope`가 전담한다. 저장소들은 경로를 직접 계산하지 않고 아래 두 가지만 쓴다.
 
@@ -199,6 +199,100 @@
 - **홈 집계**(PRD 3, 달별/카테고리별 종합·예산 대비 현황): 별도 롤업 문서 없이 해당 월 expenses를 **클라이언트에서 집계**한다(1차, 커플 단위 소규모 데이터).
 - **예산 알림**(PRD 8, 80% 도달 / 100% 초과): Cloud Function이 지출 쓰기 시 해당 월 합계를 재계산해 판단한다. 스키마상 별도 집계 필드는 두지 않는다.
 
+## 결혼 준비 (PRD 12)
+
+가계부와 **완전히 분리된 별도 컬렉션**에 둔다. `expenses`에 플래그를 달아 섞지 않는 이유 — 월 예산·홈 통계·가계부 전체보기·예산 위젯이 모두 `expenses`를 월 범위로 읽는데, 섞으면 이 모든 곳에 "웨딩 제외" 조건을 빠짐없이 붙여야 하고 하나라도 빠지면 월 예산이 수천만 원 튄다. 경로 선택은 다른 공유 데이터와 같이 `UserScope`가 한다.
+
+| 컬렉션 | 내용 |
+|---|---|
+| `{scope}/wedding/settings` | 켜짐 여부·예식일·총 예산 (문서 1개) |
+| `{scope}/weddingTasks` | 체크리스트 항목 |
+| `{scope}/weddingExpenses` | 웨딩 지출 |
+| `{scope}/weddingVendors` | 업체 |
+
+- **웨딩 항목(예식장·스드메 …)은 문서로 두지 않는다.** 1차는 6개 고정이고 편집할 수 없어(PRD 12-4) domain enum `WeddingItem`으로 충분하다. 문서에는 enum 키(`VENUE`, `SDM`, `GIFTS`, `HOUSEHOLD`, `HONEYMOON`, `ETC`)를 저장하고, 모르는 키는 `ETC`로 읽는다. 항목 편집이 들어오면 가계부 `categories`처럼 컬렉션으로 올린다.
+- 세 컬렉션 모두 **컬렉션 전체를 리스너 하나로** 구독하고 정렬·그룹·합계는 클라이언트에서 한다. 결혼 준비 기간 한 커플의 데이터는 많아야 수백 건이라 월 범위 쿼리가 필요 없다. 복합 인덱스 불필요.
+- 결혼 준비가 **꺼져 있으면 `settings`만 구독**하고 나머지 세 리스너는 붙이지 않는다 — 홈 카드가 없으니 읽을 이유가 없다.
+- 보안 규칙: 기존 `users/{userId}/{document=**}`, `couples/{coupleId}/{document=**}` 와일드카드가 그대로 적용된다. 규칙 변경 없음.
+- 연결 시 개인 경로의 결혼 준비 데이터는 옮기지 않는다 (다른 공유 데이터와 같은 원칙). 커플 경로에는 `settings` 문서가 없으므로 **꺼진 상태로 시작**한다 (wedding.md 상태 분기).
+
+### {wedding}/settings
+결혼 준비 설정. 문서 id는 항상 `settings`.
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| enabled | Boolean | 설정 > 결혼 준비 켜짐 여부. 커플 경로에 있으므로 연결 상태에서는 두 사람에게 함께 적용된다 (PRD 7) |
+| weddingDateMillis | Number? | 예식일 (UTC 자정 millis). null이면 미정 |
+| totalBudget | Long? | 총 웨딩 예산 (원). null이면 미설정 |
+| templateSeeded | Boolean | 체크리스트 기본 항목을 이미 심었는지 |
+
+- 문서가 없으면 `enabled=false`, 나머지 null/false로 읽는다.
+- **쓰기는 바꾼 필드만 `SetOptions.merge()`** — 한 사람이 예식일을, 다른 사람이 예산을 동시에 고쳐도 서로 덮어쓰지 않게.
+- 끄기는 `enabled=false`만 쓴다. 데이터는 지우지 않는다 (PRD 7 "끄면 카드만 사라지고 데이터는 남는다").
+- 가계부 `budget`처럼 월별 문서로 나누지 않는다 — 웨딩 예산은 기간 전체에 하나다.
+
+### {weddingTasks}/{taskId}
+결혼 준비 체크리스트. (PRD 12-3)
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| title | String | 제목 (최대 30자) |
+| period | String | 시기 그룹 — `M12_6` / `M6_3` / `M3_1` / `M1_W1` / `W1`. 모르는 값은 `M12_6`으로 읽는다 |
+| assignee | String | `SHARED`(우리) / `PERSONAL`(한 사람) — 할 일과 같음 |
+| ownerId | String (uid)? | `PERSONAL`일 때 담당자 uid |
+| done | Boolean | 완료 여부 |
+| completedAtMillis | Number? | 완료 시각. 그룹 안 완료 항목 정렬 키(최근 완료순). 해제 시 비운다 |
+| createdAtMillis | Number | 등록 시각. 그룹 안 미완료 정렬 키(등록순). 수정·시기 변경에도 유지 |
+| updatedAtMillis | Number? | 수정 시각 |
+
+- 담당자·완료 토글은 `todos`와 같은 규칙이다 (uid 저장, 토글은 `done`·`completedAtMillis`만 update).
+- `todos`와 컬렉션을 합치지 않는다 — 할 일 탭 리스너에 결혼 준비 항목이 섞이지 않게, 그리고 결혼 준비를 끄면 리스너째 뗄 수 있게.
+- **"지금" 시기 그룹은 저장하지 않는다.** 예식일과 오늘 날짜로 표시할 때 계산한다 (wedding.md 12-2 판정표).
+
+**기본 항목 시드**
+- 기본 항목은 **고정 문서 id**(`default_meeting`, `default_venue`, `default_sdm`, …)로 심는다. 두 사람이 동시에 켜도 같은 문서를 덮어쓸 뿐 중복되지 않는다 (categories 시드와 같은 이유). 기본 목록과 id는 domain `DefaultWeddingTasks`.
+- 시드는 **`settings.templateSeeded`가 false인 것을 서버에서 확인했을 때만** 한다 — 트랜잭션으로 `settings`를 읽고, false면 기본 항목 create + `templateSeeded=true`를 같은 트랜잭션에서 쓴다. 캐시 기준으로 판단하면, 기본 항목을 지운 뒤 오프라인에서 껐다 켤 때 지운 항목이 되살아난다 (PRD "모두 지워도 다시 채우지 않는다").
+  - 트랜잭션은 오프라인에서 실패한다. 그래서 켜기는 `enabled=true`만 먼저 쓰고, **시드는 "`enabled`가 true인데 `templateSeeded`가 true가 아님"을 서버 확인 스냅샷(`isFromCache == false`)에서 봤을 때** 실행한다. 오프라인에서 켜면 체크리스트가 비어 있다가 온라인이 되면 채워진다.
+- 시드 항목의 `createdAtMillis`는 시드 시각 + 목록 순서(ms)로 넣어, 같은 그룹 안에서 기본 목록 순서대로 보이게 한다.
+
+### {weddingExpenses}/{expenseId}
+웨딩 지출. (PRD 12-4)
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| amount | Long | 금액 (원) |
+| dateMillis | Number | 지출 날짜 (UTC 자정 millis). 시간은 받지 않는다 (wedding.md 12-5) |
+| item | String | 웨딩 항목 enum 키 |
+| vendorId | String? | weddingVendors 문서 id. 없으면 업체 선택 안 함 |
+| spenderType | String | `PERSONAL` / `SHARED` — 가계부 `expenses`와 같음 |
+| spenderId | String (uid)? | 지출자 uid. `SHARED`면 null |
+| memo | String? | 메모 |
+| createdAtMillis | Number | 등록 시각. 같은 날짜 안의 정렬 키. 수정해도 유지 |
+| updatedAtMillis | Number? | 수정 시각 |
+
+- 가계부 `expenses`와 달리 `spentAtMillis`(날짜+시간) 대신 **날짜만** 둔다. 시간 입력이 없어서다. 정렬은 `dateMillis` 내림차순 → `createdAtMillis`.
+- 예전 `spender` 폴백은 필요 없다 — 새 컬렉션이라 처음부터 `spenderType`/`spenderId`로 쓴다.
+- **지출 예정 금액은 저장하지 않는다.** 업체별 `contractAmount − 그 업체 vendorId를 가진 지출 합`을 클라이언트에서 계산한다 (wedding.md 12-7). 집계 필드를 두면 두 사람이 동시에 지출을 기록할 때 어긋난다.
+- `vendorId`가 가리키는 업체가 없으면(삭제됨, 다른 기기에서 배치 중간에 끊김 등) 업체 선택 안 함으로 읽는다.
+
+### {weddingVendors}/{vendorId}
+업체. (PRD 12-5)
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| name | String | 업체명 (최대 20자) |
+| item | String | 웨딩 항목 enum 키 |
+| status | String | `CONSULTING`(상담 중) / `CONTRACTED`(계약 완료) |
+| phone | String? | 연락처. **숫자만** 저장하고 하이픈은 표시할 때 붙인다 |
+| contractAmount | Long? | 계약 금액 (원) |
+| balanceDueMillis | Number? | 잔금일 (UTC 자정 millis) |
+| memo | String? | 메모 |
+| createdAtMillis | Number | 등록 시각. 그룹 안 정렬 키(등록순) |
+| updatedAtMillis | Number? | 수정 시각 |
+
+- **삭제는 한 배치로**: 업체 문서 delete + 그 업체 `vendorId`를 가진 지출들의 `vendorId`를 null로 update. 지출 목록은 이미 구독 중이라 추가 쿼리가 필요 없다. 배치 한도(500)는 한 업체의 지출 수로 넘을 일이 없다. 배치가 끊겨도 위 "없는 업체는 선택 안 함으로 읽는다" 규칙이 받쳐 준다.
+- 잔금일 알림은 1차 범위 밖이라 인덱스·필드를 따로 두지 않는다. 도입할 때 Cloud Functions 스케줄러가 `balanceDueMillis`로 조회한다.
+
 ## users/{userId}
 개인 프로필 + 로그인 정보. (PRD 1. 온보딩 및 로그인) 문서 id는 **Firebase Auth uid**와 동일하게 둔다. 미연결 상태에서는 이 문서 하위 컬렉션(expenses/categories/budget)이 가계부 데이터의 SSOT다.
 
@@ -309,6 +403,7 @@ Cloud Functions 없이 **클라이언트 쓰기 + 보안 규칙**만으로 두 �
 QR 형식 오류와 네트워크 오류는 규칙 이전 단계라 클라이언트만 처리한다.
 
 ## 미확정 사항
+- **예식일이 지난 뒤 결혼 준비 처리** (PRD 12 남은 결정 사항) — 결혼기념일로 넘겨주기를 도입하면 `wedding/settings.weddingDateMillis`를 `users/{uid}.anniversaryMillis`로 복사하는 흐름이 된다. 연결 상태에서는 두 사람 문서에 각각 써야 하는데 상대 `users` 문서는 쓸 수 없어 각자 앱에서 처리해야 한다
 - 카테고리별 예산 향후 도입 여부 (PRD 10 남은 결정 필요 사항)
 - **상대 생일/기념일의 디데이 반영** — 프로필을 개인 경로에 두기로 해서 상대 생일을 읽을 수 없다. `couples.members`에 생일까지 미러링할지, 디데이 AUTO 항목은 각자 것만 볼지 결정 필요 (PRD 6과 직결)
 - **연결 해제 후 유예기간 중 공동 데이터 열람 동선** — 경로가 개인으로 되돌아가면 공동 데이터가 어느 화면에도 노출되지 않는다. 해제 설계 시 함께 정한다
