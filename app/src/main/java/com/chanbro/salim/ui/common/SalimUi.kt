@@ -334,6 +334,18 @@ fun CategoryChip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     trailingIcon: ImageVector? = null,
+) = CategoryChip(categoryIcon(iconKey), colorKey, label, selected, onClick, modifier, trailingIcon)
+
+/** 아이콘을 직접 넘기는 카테고리 칩. 웨딩 항목처럼 가계부 카테고리가 아닌 것도 같은 톤으로 그린다. (design.md 웨딩 항목) */
+@Composable
+fun CategoryChip(
+    icon: ImageVector,
+    colorKey: String,
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    trailingIcon: ImageVector? = null,
 ) {
     val color = categoryColor(colorKey)
     ChipLayout(
@@ -345,7 +357,7 @@ fun CategoryChip(
         ),
         textColor = SalimTokens.TextPrimary,
         modifier = modifier,
-        leadingIcon = categoryIcon(iconKey),
+        leadingIcon = icon,
         iconTint = color,
         borderColor = if (selected) color else null,
         trailingIcon = trailingIcon,
@@ -486,6 +498,9 @@ fun DatePickerModal(
     // 고를 수 있는 날짜 범위 (UTC 자정 millis, 양끝 포함). 가계부 필터는 선택한 달 안으로 막는다.
     minDateUtc: Long? = null,
     maxDateUtc: Long? = null,
+    // 날짜를 비울 수 있는 칸(예식일 "미정으로", 잔금일 "선택 안 함")에서만 넘긴다. 취소 옆에 버튼이 붙는다.
+    clearLabel: String? = null,
+    onClear: () -> Unit = {},
 ) {
     val selectableDates = remember(minDateUtc, maxDateUtc) {
         object : SelectableDates {
@@ -507,7 +522,12 @@ fun DatePickerModal(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("취소", color = SalimTokens.TextMuted) }
+            Row {
+                if (clearLabel != null) {
+                    TextButton(onClick = onClear) { Text(clearLabel, color = SalimTokens.TextMuted) }
+                }
+                TextButton(onClick = onDismiss) { Text("취소", color = SalimTokens.TextMuted) }
+            }
         },
     ) {
         DatePicker(state = state)
@@ -598,8 +618,11 @@ fun categoryColor(colorKey: String): Color = when (colorKey) {
 
 /** 카테고리 아이콘을 옅은 같은 색 배경 위에 올린 배지. 가계부 리스트와 카테고리 수정 목록에서 쓴다. */
 @Composable
-fun CategoryIconBadge(iconKey: String, colorKey: String, modifier: Modifier = Modifier, size: Dp = 42.dp) {
-    val icon = categoryIcon(iconKey)
+fun CategoryIconBadge(iconKey: String, colorKey: String, modifier: Modifier = Modifier, size: Dp = 42.dp) =
+    CategoryIconBadge(categoryIcon(iconKey), colorKey, modifier, size)
+
+@Composable
+fun CategoryIconBadge(icon: ImageVector, colorKey: String, modifier: Modifier = Modifier, size: Dp = 42.dp) {
     val color = categoryColor(colorKey)
     Box(
         modifier = modifier

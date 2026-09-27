@@ -53,6 +53,10 @@ import com.chanbro.salim.ui.dday.DDayScreen
 import com.chanbro.salim.ui.expense.ExpenseInputScreen
 import com.chanbro.salim.ui.expense.ExpenseScreen
 import com.chanbro.salim.ui.todo.TodoScreen
+import com.chanbro.salim.ui.wedding.VendorDetailScreen
+import com.chanbro.salim.ui.wedding.VendorInputScreen
+import com.chanbro.salim.ui.wedding.WeddingExpenseInputScreen
+import com.chanbro.salim.ui.wedding.WeddingScreen
 import com.chanbro.salim.ui.auth.LoginScreen
 import com.chanbro.salim.ui.home.HomeScreen
 import com.chanbro.salim.ui.onboarding.OnboardingScreen
@@ -87,6 +91,30 @@ private const val ROUTE_CONNECT = "connect"
 private const val ROUTE_CONNECT_INVITE = "connect_invite"
 private const val ROUTE_CONNECT_CODE = "connect_code?code={code}"
 private const val ROUTE_CONNECT_DONE = "connect_done"
+
+// 결혼 준비 (wedding.md 12-1~12-8)
+private const val ROUTE_WEDDING = "wedding"
+private const val ROUTE_WEDDING_EXPENSE = "wedding_expense?expenseId={expenseId}&vendorId={vendorId}"
+private const val ROUTE_WEDDING_VENDOR = "wedding_vendor/{vendorId}"
+private const val ROUTE_WEDDING_VENDOR_INPUT = "wedding_vendor_input?vendorId={vendorId}"
+
+private fun weddingExpenseRoute(expenseId: String? = null, vendorId: String? = null): String =
+    "wedding_expense?expenseId=${Uri.encode(expenseId.orEmpty())}&vendorId=${Uri.encode(vendorId.orEmpty())}"
+
+private fun weddingVendorRoute(vendorId: String): String = "wedding_vendor/${Uri.encode(vendorId)}"
+
+private fun weddingVendorInputRoute(vendorId: String? = null): String =
+    "wedding_vendor_input?vendorId=${Uri.encode(vendorId.orEmpty())}"
+
+/** 선택 인자. 빈 문자열로 넘긴 것은 없음으로 본다. */
+private fun optionalStringArg(name: String) = navArgument(name) {
+    type = NavType.StringType
+    nullable = true
+    defaultValue = null
+}
+
+private fun androidx.navigation.NavBackStackEntry.optionalArg(name: String): String? =
+    arguments?.getString(name)?.takeIf { it.isNotEmpty() }
 
 private fun connectCodeRoute(code: String? = null): String =
     if (code == null) "connect_code" else "connect_code?code=${Uri.encode(code)}"
@@ -230,6 +258,7 @@ private fun SalimNavGraph(
                     HomeScreen(
                         onConnectClick = { navController.navigate(ROUTE_CONNECT) },
                         onDDayClick = { navController.navigate(ROUTE_DDAY_MANAGE) },
+                        onWeddingClick = { navController.navigate(ROUTE_WEDDING) },
                     )
                 }
             }
@@ -378,6 +407,53 @@ private fun SalimNavGraph(
             }
             composable(ROUTE_CATEGORY_EDIT) {
                 CategoryEditScreen(onClose = { navController.popBackStack() })
+            }
+            // 결혼 준비 — 홈 결혼 준비 카드에서만 들어온다 (PRD 12, 하단 탭 없음)
+            composable(ROUTE_WEDDING) {
+                WeddingScreen(
+                    onBack = { navController.popBackStack() },
+                    onAddExpense = { navController.navigate(weddingExpenseRoute()) },
+                    onExpenseClick = { navController.navigate(weddingExpenseRoute(expenseId = it)) },
+                    onAddVendor = { navController.navigate(weddingVendorInputRoute()) },
+                    onVendorClick = { navController.navigate(weddingVendorRoute(it)) },
+                )
+            }
+            composable(
+                ROUTE_WEDDING_EXPENSE,
+                arguments = listOf(optionalStringArg("expenseId"), optionalStringArg("vendorId")),
+            ) { entry ->
+                WeddingExpenseInputScreen(
+                    onClose = { navController.popBackStack() },
+                    onDone = { navController.popBackStack() },
+                    expenseId = entry.optionalArg("expenseId"),
+                    vendorId = entry.optionalArg("vendorId"),
+                )
+            }
+            composable(
+                ROUTE_WEDDING_VENDOR,
+                arguments = listOf(navArgument("vendorId") { type = NavType.StringType }),
+            ) { entry ->
+                val vendorId = entry.arguments?.getString("vendorId").orEmpty()
+                VendorDetailScreen(
+                    vendorId = vendorId,
+                    onBack = { navController.popBackStack() },
+                    onEdit = { navController.navigate(weddingVendorInputRoute(vendorId)) },
+                    onRecordExpense = { navController.navigate(weddingExpenseRoute(vendorId = vendorId)) },
+                    onExpenseClick = { navController.navigate(weddingExpenseRoute(expenseId = it)) },
+                )
+            }
+            composable(
+                ROUTE_WEDDING_VENDOR_INPUT,
+                arguments = listOf(optionalStringArg("vendorId")),
+            ) { entry ->
+                VendorInputScreen(
+                    onClose = { navController.popBackStack() },
+                    // 추가 → 업체 목록, 수정 → 업체 상세. 둘 다 한 단계 뒤다.
+                    onSaved = { navController.popBackStack() },
+                    // 삭제하면 상세를 건너뛰고 업체 목록으로 (wedding.md 12-8)
+                    onDeleted = { navController.popBackStack(ROUTE_WEDDING, inclusive = false) },
+                    vendorId = entry.optionalArg("vendorId"),
+                )
             }
         }
     }

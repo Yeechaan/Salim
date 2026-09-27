@@ -80,6 +80,7 @@ fun SettingsScreen(
         onConnectClick = onConnectClick,
         onBudgetClick = { showBudgetSheet = true },
         onWidgetShowAmountChange = viewModel::onWidgetShowAmountChange,
+        onWeddingEnabledChange = viewModel::onWeddingEnabledChange,
         onSignOutClick = { confirmingSignOut = true },
     )
 
@@ -117,6 +118,7 @@ private fun SettingsContent(
     onConnectClick: () -> Unit,
     onBudgetClick: () -> Unit,
     onWidgetShowAmountChange: (Boolean) -> Unit,
+    onWeddingEnabledChange: (Boolean) -> Unit,
     onSignOutClick: () -> Unit,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
@@ -160,6 +162,13 @@ private fun SettingsContent(
                     label = "알림 설정",
                     value = "준비 중",
                     enabled = false,
+                )
+                RowDivider()
+                // 켜면 홈에 결혼 준비 카드가 생긴다. 연결 상태면 두 사람에게 함께 적용 (PRD 7/12)
+                SettingsToggleRow(
+                    label = stringResource(R.string.settings_wedding),
+                    checked = state.weddingEnabled,
+                    onCheckedChange = onWeddingEnabledChange,
                 )
                 RowDivider()
                 // 끄면 예산 위젯이 금액 없이 사용률만 보여준다 (PRD 10-2). 이 기기에만 적용
@@ -400,6 +409,7 @@ private fun SettingsScreenPreview() {
             onConnectClick = {},
             onBudgetClick = {},
             onWidgetShowAmountChange = {},
+            onWeddingEnabledChange = {},
             onSignOutClick = {},
         )
     }

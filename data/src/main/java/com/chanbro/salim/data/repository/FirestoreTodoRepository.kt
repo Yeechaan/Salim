@@ -59,7 +59,7 @@ class FirestoreTodoRepository @Inject constructor(
                 "completedAtMillis" to todo.completedAtMillis,
                 "createdAtMillis" to todo.createdAtMillis,
                 "parentId" to todo.parentId,
-            ) + assigneeFields(scope, todo.assignee, deleteOwner = false)
+            ) + scope.assigneeFields(todo.assignee, deleteOwner = false)
             batch.set(todos.document(todo.id), data)
         }
         plan.patches.forEach { patch ->
@@ -67,7 +67,7 @@ class FirestoreTodoRepository @Inject constructor(
             val data = mapOf(
                 "title" to patch.title,
                 "updatedAtMillis" to patch.updatedAtMillis,
-            ) + assigneeFields(scope, patch.assignee, deleteOwner = true)
+            ) + scope.assigneeFields(patch.assignee, deleteOwner = true)
             batch.update(todos.document(patch.id), data)
         }
         plan.deletes.forEach { batch.delete(todos.document(it)) }
@@ -101,32 +101,12 @@ class FirestoreTodoRepository @Inject constructor(
     private fun collection(scopeDoc: DocumentReference): CollectionReference =
         scopeDoc.collection("todos")
 
-    /**
-     * 지출자·일정 주인과 같은 이유로 "나/상대" 대신 SHARED 또는 PERSONAL + 담당자 uid로 저장한다.
-     * @param deleteOwner 수정일 때 "우리"로 바꾸면 남아 있던 ownerId를 지운다.
-     */
-    private fun assigneeFields(scope: DataScope, assignee: TodoAssignee, deleteOwner: Boolean): Map<String, Any?> =
-        when (assignee) {
-            TodoAssignee.TOGETHER -> buildMap {
-                put("assignee", ASSIGNEE_SHARED)
-                if (deleteOwner) put("ownerId", FieldValue.delete())
-            }
-            TodoAssignee.ME -> mapOf("assignee" to ASSIGNEE_PERSONAL, "ownerId" to scope.myUid)
-            // 미연결이면 상대가 없으므로 본인으로 떨어진다.
-            TodoAssignee.PARTNER -> mapOf("assignee" to ASSIGNEE_PERSONAL, "ownerId" to (scope.partnerUid ?: scope.myUid))
-        }
-
     private fun DocumentSnapshot.toTodo(myUid: String): Todo? {
         val title = getString("title") ?: return null
-        val assignee = when {
-            getString("assignee") != ASSIGNEE_PERSONAL -> TodoAssignee.TOGETHER
-            getString("ownerId") == myUid -> TodoAssignee.ME
-            else -> TodoAssignee.PARTNER
-        }
         return Todo(
             id = id,
             title = title,
-            assignee = assignee,
+            assignee = readAssignee(myUid),
             done = getBoolean("done") ?: false,
             completedAtMillis = getLong("completedAtMillis"),
             createdAtMillis = getLong("createdAtMillis") ?: 0L,
@@ -134,9 +114,30 @@ class FirestoreTodoRepository @Inject constructor(
             parentId = getString("parentId"),
         )
     }
+}
 
-    private companion object {
-        const val ASSIGNEE_SHARED = "SHARED"
-        const val ASSIGNEE_PERSONAL = "PERSONAL"
+private const val ASSIGNEE_SHARED = "SHARED"
+private const val ASSIGNEE_PERSONAL = "PERSONAL"
+
+/**
+ * 담당자 필드. 지출자·일정 주인과 같은 이유로 "나/상대" 대신 SHARED 또는 PERSONAL + 담당자 uid로 저장한다.
+ * 할 일과 결혼 준비 체크리스트가 같이 쓴다.
+ * @param deleteOwner 수정일 때 "우리"로 바꾸면 남아 있던 ownerId를 지운다.
+ */
+internal fun DataScope.assigneeFields(assignee: TodoAssignee, deleteOwner: Boolean): Map<String, Any?> =
+    when (assignee) {
+        TodoAssignee.TOGETHER -> buildMap {
+            put("assignee", ASSIGNEE_SHARED)
+            if (deleteOwner) put("ownerId", FieldValue.delete())
+        }
+        TodoAssignee.ME -> mapOf("assignee" to ASSIGNEE_PERSONAL, "ownerId" to myUid)
+        // 미연결이면 상대가 없으므로 본인으로 떨어진다.
+        TodoAssignee.PARTNER -> mapOf("assignee" to ASSIGNEE_PERSONAL, "ownerId" to (partnerUid ?: myUid))
     }
+
+/** [assigneeFields]로 저장한 담당자를 보는 사람 기준으로 읽는다. */
+internal fun DocumentSnapshot.readAssignee(myUid: String): TodoAssignee = when {
+    getString("assignee") != ASSIGNEE_PERSONAL -> TodoAssignee.TOGETHER
+    getString("ownerId") == myUid -> TodoAssignee.ME
+    else -> TodoAssignee.PARTNER
 }

@@ -60,6 +60,7 @@ import com.chanbro.salim.ui.common.categoryColor
 import com.chanbro.salim.ui.connect.ConnectViewModel
 import com.chanbro.salim.ui.dday.DDayListViewModel
 import com.chanbro.salim.ui.dday.upcoming
+import com.chanbro.salim.ui.wedding.WeddingHomeCard
 
 // ---------------------------------------------------------------------------
 // 화면 (하단 탭바는 상위 Scaffold가 제공, 여기서는 콘텐츠만)
@@ -70,6 +71,7 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     onConnectClick: () -> Unit = {},
     onDDayClick: () -> Unit = {},
+    onWeddingClick: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -91,6 +93,8 @@ fun HomeScreen(
             )
             ConnectBanner(onClick = onConnectClick)
             BudgetCard(state = state, onClick = { showBudgetSheet = true })
+            // 결혼 준비를 켠 경우에만 — 준비 기간엔 자주 들어가는 곳이라 예산 카드 바로 아래 (home.md 2-2)
+            WeddingHomeCard(onClick = onWeddingClick)
             CategoryCard(state.categories)
             UpcomingDDayCard(onClick = onDDayClick)
             RecentTransactionsCard(state.recent)
