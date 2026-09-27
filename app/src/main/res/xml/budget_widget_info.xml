@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 예산 위젯 — 소형 (PRD 10-2, wireframe/widget.md 10-2). 디데이 위젯과 같은 크기라 나란히 놓인다.
+     updatePeriodMillis=0: 자정 알람과 앱 실행 중 변경 감지로 갱신한다 (WidgetRefresh / WidgetUpdater). -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/widget_budget_description"
+    android:initialLayout="@layout/glance_default_loading_layout"
+    android:minWidth="110dp"
+    android:minHeight="110dp"
+    android:minResizeWidth="110dp"
+    android:minResizeHeight="40dp"
+    android:resizeMode="horizontal|vertical"
+    android:targetCellWidth="2"
+    android:targetCellHeight="2"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="home_screen" />

@@ -89,6 +89,8 @@ dependencies {
     // 상대방 연결 QR (PRD 9) — 코드 스캐너는 카메라 권한 없이 GMS가 UI를 제공한다
     implementation(libs.zxing.core)
     implementation(libs.play.services.code.scanner)
+    // 홈 화면 위젯 (PRD 10) — RemoteViews를 Compose 문법으로 그린다
+    implementation(libs.androidx.glance.appwidget)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

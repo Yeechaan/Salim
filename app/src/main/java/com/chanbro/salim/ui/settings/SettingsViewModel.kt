@@ -8,6 +8,8 @@ import com.chanbro.salim.domain.usecase.ObserveBudgetUseCase
 import com.chanbro.salim.domain.usecase.ObserveConnectionUseCase
 import com.chanbro.salim.domain.usecase.ObserveProfileUseCase
 import com.chanbro.salim.domain.usecase.SaveBudgetUseCase
+import com.chanbro.salim.domain.usecase.ObserveWidgetShowAmountUseCase
+import com.chanbro.salim.domain.usecase.SetWidgetShowAmountUseCase
 import com.chanbro.salim.domain.usecase.SignOutUseCase
 import com.chanbro.salim.ui.common.currentYearMonth
 import com.chanbro.salim.ui.common.formatWon
@@ -25,6 +27,8 @@ data class SettingsUiState(
     val budgetAmount: Long? = null,
     val connection: Connection = Connection.Unknown,
     val profileName: String? = null,
+    /** 예산 위젯 금액 표시 (PRD 7/10-2). 기본 켜짐. */
+    val widgetShowAmount: Boolean = true,
 ) {
     /** 목록 우측에 노출할 현재 예산값. 미설정이면 안내 문구. (wireframe/settings.md 3.) */
     val budgetText: String
@@ -40,8 +44,10 @@ class SettingsViewModel @Inject constructor(
     observeBudget: ObserveBudgetUseCase,
     observeConnection: ObserveConnectionUseCase,
     observeProfile: ObserveProfileUseCase,
+    observeWidgetShowAmount: ObserveWidgetShowAmountUseCase,
     private val saveBudget: SaveBudgetUseCase,
     private val signOut: SignOutUseCase,
+    private val setWidgetShowAmount: SetWidgetShowAmountUseCase,
 ) : ViewModel() {
 
     // 설정의 "달별 예산"은 이번 달 기준으로 보여준다.
@@ -52,13 +58,15 @@ class SettingsViewModel @Inject constructor(
             observeBudget(yearMonth.first, yearMonth.second),
             observeConnection(),
             observeProfile(),
-        ) { budget, connection, profile ->
+            observeWidgetShowAmount(),
+        ) { budget, connection, profile, widgetShowAmount ->
             SettingsUiState(
                 year = yearMonth.first,
                 month = yearMonth.second,
                 budgetAmount = budget?.amount,
                 connection = connection,
                 profileName = profile.displayName,
+                widgetShowAmount = widgetShowAmount,
             )
         }
             .stateIn(
@@ -71,6 +79,11 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             saveBudget(Budget(yearMonth.first, yearMonth.second, amount))
         }
+    }
+
+    /** 예산 위젯은 이 값을 구독하고 있어 저장만 하면 다시 그려진다 (WidgetUpdater). */
+    fun onWidgetShowAmountChange(show: Boolean) {
+        viewModelScope.launch { setWidgetShowAmount(show) }
     }
 
     /** 로그아웃 후 화면 이동은 인증 게이트(AppViewModel)가 auth 상태를 보고 처리한다. */

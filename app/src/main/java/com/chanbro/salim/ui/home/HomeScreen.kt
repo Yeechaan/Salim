@@ -59,6 +59,7 @@ import com.chanbro.salim.ui.common.SalimType
 import com.chanbro.salim.ui.common.categoryColor
 import com.chanbro.salim.ui.connect.ConnectViewModel
 import com.chanbro.salim.ui.dday.DDayListViewModel
+import com.chanbro.salim.ui.dday.upcoming
 
 // ---------------------------------------------------------------------------
 // 화면 (하단 탭바는 상위 Scaffold가 제공, 여기서는 콘텐츠만)
@@ -359,7 +360,7 @@ private fun DonutChart(categories: List<CategorySpendUi>) {
 private fun UpcomingDDayCard(onClick: () -> Unit, viewModel: DDayListViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     // 가장 가까운 1~2건만 노출. 이미 지난 항목은 제외 (wireframe/home.md 4.)
-    val upcoming = state.rows.filterNot { it.dDayText.startsWith("D+") }.take(2)
+    val upcoming = state.rows.upcoming().take(2)
 
     // 디데이 탭이 없어져 카드 전체가 설정 > 디데이 관리로 가는 입구다 (home.md 4)
     SalimCard(cornerRadius = 24.dp, modifier = Modifier.clickable(onClick = onClick)) {

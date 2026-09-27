@@ -2,6 +2,7 @@ package com.chanbro.salim.di
 
 import android.content.Context
 import com.chanbro.salim.data.local.OnboardingPreferences
+import com.chanbro.salim.data.local.WidgetPreferences
 import com.chanbro.salim.data.repository.FirebaseAuthRepository
 import com.chanbro.salim.data.repository.FirestoreConnectionRepository
 import com.chanbro.salim.data.repository.FirestoreBudgetRepository
@@ -21,6 +22,7 @@ import com.chanbro.salim.domain.repository.OnboardingRepository
 import com.chanbro.salim.domain.repository.ProfileRepository
 import com.chanbro.salim.domain.repository.ScheduleRepository
 import com.chanbro.salim.domain.repository.TodoRepository
+import com.chanbro.salim.domain.repository.WidgetSettingsRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import dagger.Binds
@@ -86,5 +88,11 @@ abstract class RepositoryModule {
         fun provideOnboardingRepository(
             @ApplicationContext context: Context,
         ): OnboardingRepository = OnboardingPreferences(context)
+
+        @Provides
+        @Singleton
+        fun provideWidgetSettingsRepository(
+            @ApplicationContext context: Context,
+        ): WidgetSettingsRepository = WidgetPreferences(context)
     }
 }

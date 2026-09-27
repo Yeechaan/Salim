@@ -45,6 +45,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TextButton
@@ -708,3 +710,19 @@ fun formatThousands(digits: String): String {
  * [formatThousands]는 입력칸 placeholder 때문에 0을 ""로 돌려주므로, 금액 표시는 이 함수를 쓴다.
  */
 fun formatWon(amount: Long): String = "${formatThousands(amount.toString()).ifEmpty { "0" }}원"
+
+/** 앱 공통 토글 (design.md "스위치"). 켜짐 Coral 트랙, 꺼짐 진행률 트랙색. */
+@Composable
+fun SalimSwitch(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?) {
+    Switch(
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        colors = SwitchDefaults.colors(
+            checkedThumbColor = Color.White,
+            checkedTrackColor = SalimTokens.Accent,
+            uncheckedThumbColor = Color.White,
+            uncheckedTrackColor = SalimTokens.ProgressTrack,
+            uncheckedBorderColor = SalimTokens.ProgressTrack,
+        ),
+    )
+}

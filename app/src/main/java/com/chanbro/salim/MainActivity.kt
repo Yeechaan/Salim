@@ -32,6 +32,7 @@ import androidx.compose.ui.res.stringResource
 import dagger.hilt.android.AndroidEntryPoint
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -68,6 +69,13 @@ private const val ROUTE_EXPENSE_INPUT = "expense_input"
 private const val ROUTE_EXPENSE_EDIT = "expense_edit/{expenseId}"
 private const val ROUTE_DDAY_MANAGE = "dday_manage"
 private const val ROUTE_DDAY_INPUT = "dday_input"
+
+/**
+ * 홈 화면 위젯 진입점 (PRD 10). 위젯이 MainActivity를 명시적으로 지정해 여므로
+ * 매니페스트 intent-filter는 두지 않는다 — 외부 앱이 쓸 이유가 없는 진입점이다.
+ */
+internal const val DEEP_LINK_DDAY_MANAGE = "salim://dday"
+internal const val DEEP_LINK_HOME = "salim://home"
 private const val ROUTE_DDAY_EDIT = "dday_edit/{ddayId}"
 private const val ROUTE_SCHEDULE_INPUT = "schedule_input/{dateMillis}"
 private const val ROUTE_SCHEDULE_EDIT = "schedule_edit/{scheduleId}"
@@ -213,11 +221,17 @@ private fun SalimNavGraph(
         ) {
             composable(ROUTE_ONBOARDING) { OnboardingScreen(onFinish = onOnboardingFinished) }
             composable(ROUTE_LOGIN) { LoginScreen() }
-            composable(SalimTab.Home.route) {
-                HomeScreen(
-                    onConnectClick = { navController.navigate(ROUTE_CONNECT) },
-                    onDDayClick = { navController.navigate(ROUTE_DDAY_MANAGE) },
-                )
+            composable(
+                SalimTab.Home.route,
+                // 예산 위젯 (widget.md 10-2)
+                deepLinks = listOf(navDeepLink { uriPattern = DEEP_LINK_HOME }),
+            ) {
+                RequireMain(appState, navController) {
+                    HomeScreen(
+                        onConnectClick = { navController.navigate(ROUTE_CONNECT) },
+                        onDDayClick = { navController.navigate(ROUTE_DDAY_MANAGE) },
+                    )
+                }
             }
             composable(SalimTab.Expense.route) {
                 ExpenseScreen(onItemClick = { row -> navController.navigate(expenseEditRoute(row.id)) })
@@ -234,17 +248,22 @@ private fun SalimNavGraph(
                     onAddHandled = { todoAddRequested = false },
                 )
             }
-            // 설정 > 디데이 관리 / 홈 디데이 카드 (dday.md 6-1)
-            composable(ROUTE_DDAY_MANAGE) {
-                DDayScreen(
-                    onBack = { navController.popBackStack() },
-                    onAddClick = { navController.navigate(ROUTE_DDAY_INPUT) },
-                    onItemClick = { row ->
-                        // 자동 반영 항목(생일/기념일)은 설정 > 프로필에서만 수정 (PRD 6.)
-                        // TODO: 자동 항목 탭 시 안내/프로필 이동 흐름 확정 필요 (dday.md 6-1)
-                        if (!row.isAuto) navController.navigate(ddayEditRoute(row.id))
-                    },
-                )
+            // 설정 > 디데이 관리 / 홈 디데이 카드 / 홈 화면 위젯 (dday.md 6-1)
+            composable(
+                ROUTE_DDAY_MANAGE,
+                deepLinks = listOf(navDeepLink { uriPattern = DEEP_LINK_DDAY_MANAGE }),
+            ) {
+                RequireMain(appState, navController) {
+                    DDayScreen(
+                        onBack = { navController.popBackStack() },
+                        onAddClick = { navController.navigate(ROUTE_DDAY_INPUT) },
+                        onItemClick = { row ->
+                            // 자동 반영 항목(생일/기념일)은 설정 > 프로필에서만 수정 (PRD 6.)
+                            // TODO: 자동 항목 탭 시 안내/프로필 이동 흐름 확정 필요 (dday.md 6-1)
+                            if (!row.isAuto) navController.navigate(ddayEditRoute(row.id))
+                        },
+                    )
+                }
             }
             composable(SalimTab.Settings.route) {
                 SettingsScreen(
@@ -279,15 +298,8 @@ private fun SalimNavGraph(
                 // 초대 QR / 공유 링크로 바로 들어오는 경로 (connect.md 9-3)
                 deepLinks = listOf(navDeepLink { uriPattern = "salim://invite/{code}" }),
             ) { entry ->
-                // 딥링크는 로그인 전에도 들어올 수 있다. 그때는 진입 상태가 정한 화면으로
-                // 돌려보내고, 코드는 로그인 후 다시 입력하게 한다.
-                if (appState != AppUiState.Main) {
-                    LaunchedEffect(Unit) {
-                        navController.navigate(appState.route()) {
-                            popUpTo(0) { inclusive = true }
-                        }
-                    }
-                } else {
+                // 로그인 전이면 코드는 로그인 후 다시 입력하게 한다.
+                RequireMain(appState, navController) {
                     CodeInputScreen(
                         onClose = { navController.popBackStack() },
                         onConnected = { navController.navigateToConnectDone() },
@@ -366,6 +378,27 @@ private fun SalimNavGraph(
             }
             composable(ROUTE_CATEGORY_EDIT) {
                 CategoryEditScreen(onClose = { navController.popBackStack() })
+            }
+        }
+    }
+}
+
+/**
+ * 딥링크(초대 QR·위젯)로 들어오는 화면의 로그인 게이트. 딥링크는 로그인 전에도 들어올 수 있어서,
+ * 그때는 [content] 대신 진입 상태가 정한 화면(온보딩/로그인)으로 돌려보낸다.
+ */
+@Composable
+private fun RequireMain(
+    appState: AppUiState,
+    navController: NavHostController,
+    content: @Composable () -> Unit,
+) {
+    if (appState == AppUiState.Main) {
+        content()
+    } else {
+        LaunchedEffect(Unit) {
+            navController.navigate(appState.route()) {
+                popUpTo(0) { inclusive = true }
             }
         }
     }

@@ -30,9 +30,10 @@ class FirestoreExpenseRepository @Inject constructor(
     private val userScope: UserScope,
 ) : ExpenseRepository {
 
+    // settledScope — 판정 전 빈 목록을 흘리지 않는다. 위젯이 첫 값만 읽고 그리기 때문 (PRD 10).
     @OptIn(ExperimentalCoroutinesApi::class)
     override fun observeMonth(year: Int, month: Int): Flow<List<Expense>> =
-        userScope.scope.flatMapLatest { scope ->
+        userScope.settledScope.flatMapLatest { scope ->
             if (scope == null) return@flatMapLatest flowOf(emptyList())
             callbackFlow {
                 val startMillis = startOfMonth(year, month)

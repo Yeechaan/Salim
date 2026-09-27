@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
@@ -64,6 +65,13 @@ class UserScope @Inject constructor(
      * 경로가 그대로면 저장소들이 리스너를 헐고 다시 붙을 이유가 없다.
      */
     val scope: Flow<DataScope?> = resolved.map { it.scope }.distinctUntilChanged()
+
+    /**
+     * [scope]와 같지만 커플 판정 전(pending)에는 내보내지 않는다. null은 곧 "미로그인"이다.
+     * 첫 값을 한 번만 읽는 쪽(홈 화면 위젯)이 판정 전의 빈 목록을 실제 결과로 오인하지 않게 한다.
+     */
+    val settledScope: Flow<DataScope?> =
+        resolved.filter { it.settled }.map { it.scope }.distinctUntilChanged()
 
     /** 커플 문서. 미연결이면 null, 판정 전에는 [CoupleState.settled]가 false. */
     val coupleState: Flow<CoupleState> = resolved.map { CoupleState(it.settled, it.couple) }
