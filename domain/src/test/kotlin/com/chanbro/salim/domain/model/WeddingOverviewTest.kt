@@ -1,7 +1,9 @@
 package com.chanbro.salim.domain.model
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.Calendar
 import java.util.TimeZone
@@ -34,6 +36,100 @@ class WeddingOverviewTest {
 
         assertEquals(-200_000L, overview.remainingFor(hall))
         assertEquals(0L, overview.plannedTotal)
+    }
+
+    @Test
+    fun `잔금을 기록한 업체는 남은 금액이 있어도 지출 예정에서 빠진다`() {
+        val hall = vendor("hall", VendorStatus.CONTRACTED, contract = 5_000_000)
+        val overview = WeddingOverview(
+            vendors = listOf(hall),
+            expenses = listOf(
+                expense("deposit", 1_000_000, vendorId = "hall", type = PaymentType.DEPOSIT),
+                // 할인받아 계약 금액보다 덜 냈다
+                expense("balance", 3_800_000, vendorId = "hall", type = PaymentType.BALANCE),
+            ),
+        )
+
+        assertEquals(200_000L, overview.remainingFor(hall))
+        assertTrue(overview.isBalancePaid("hall"))
+        assertEquals(0L, overview.plannedTotal)
+    }
+
+    @Test
+    fun `계약금·중도금만 기록한 업체는 남은 금액이 지출 예정에 남는다`() {
+        val overview = WeddingOverview(
+            vendors = listOf(vendor("hall", VendorStatus.CONTRACTED, contract = 5_000_000)),
+            expenses = listOf(
+                expense("deposit", 1_000_000, vendorId = "hall", type = PaymentType.DEPOSIT),
+                expense("interim", 2_000_000, vendorId = "hall", type = PaymentType.INTERIM),
+            ),
+        )
+
+        assertFalse(overview.isBalancePaid("hall"))
+        assertEquals(2_000_000L, overview.plannedTotal)
+    }
+
+    @Test
+    fun `업체가 지워진 지출은 구분을 보여주지 않는다`() {
+        val overview = WeddingOverview(
+            vendors = listOf(vendor("hall", VendorStatus.CONTRACTED)),
+            expenses = listOf(
+                expense("kept", 100, vendorId = "hall", type = PaymentType.BALANCE),
+                expense("orphan", 100, vendorId = "gone", type = PaymentType.BALANCE),
+            ),
+        )
+
+        assertEquals(PaymentType.BALANCE, overview.paymentTypeOf(overview.expenses[0]))
+        assertNull(overview.paymentTypeOf(overview.expenses[1]))
+    }
+
+    @Test
+    fun `잔금은 계약 금액에서 계약금·중도금을 뺀 나머지다`() {
+        val split = vendor("hall", VendorStatus.CONTRACTED, contract = 5_000_000)
+            .copy(depositAmount = 1_000_000, interimAmount = 2_000_000)
+
+        assertTrue(split.isSplit)
+        assertEquals(1_000_000L, split.amountOf(PaymentType.DEPOSIT))
+        assertEquals(2_000_000L, split.amountOf(PaymentType.INTERIM))
+        assertEquals(2_000_000L, split.amountOf(PaymentType.BALANCE))
+    }
+
+    @Test
+    fun `나눠 적지 않은 업체는 구분별 금액이 없다`() {
+        val plain = vendor("hall", VendorStatus.CONTRACTED, contract = 5_000_000)
+        val onlyDeposit = plain.copy(depositAmount = 1_000_000)
+
+        assertFalse(plain.isSplit)
+        assertNull(plain.amountOf(PaymentType.BALANCE))
+        // 중도금을 비워 두면 중도금은 없고 잔금은 나머지 전부
+        assertNull(onlyDeposit.amountOf(PaymentType.INTERIM))
+        assertEquals(4_000_000L, onlyDeposit.amountOf(PaymentType.BALANCE))
+    }
+
+    @Test
+    fun `계약금과 중도금 합이 계약 금액을 넘으면 저장할 수 없다`() {
+        assertTrue(WeddingVendor.isSplitValid(5_000_000, 1_000_000, 4_000_000))
+        assertFalse(WeddingVendor.isSplitValid(5_000_000, 3_000_000, 3_000_000))
+        assertTrue(WeddingVendor.isSplitValid(null, null, null))
+    }
+
+    @Test
+    fun `구분별 완료는 그 구분으로 기록한 지출이 있는지로 본다`() {
+        val overview = WeddingOverview(
+            vendors = listOf(vendor("hall", VendorStatus.CONTRACTED, contract = 5_000_000)),
+            expenses = listOf(expense("d", 900_000, vendorId = "hall", type = PaymentType.DEPOSIT)),
+        )
+
+        assertTrue(overview.isPaid("hall", PaymentType.DEPOSIT))
+        assertFalse(overview.isPaid("hall", PaymentType.INTERIM))
+        assertFalse(overview.isBalancePaid("hall"))
+    }
+
+    @Test
+    fun `모르는 구분 값은 구분 없음으로 읽는다`() {
+        assertNull(PaymentType.fromKey("REFUND"))
+        assertNull(PaymentType.fromKey(null))
+        assertEquals(PaymentType.BALANCE, PaymentType.fromKey("BALANCE"))
     }
 
     @Test
@@ -131,8 +227,14 @@ class WeddingOverviewTest {
         createdAt: Long = 0,
     ) = WeddingVendor(id, id, WeddingItem.VENUE, status, null, contract, null, null, createdAt)
 
-    private fun expense(id: String, amount: Long, vendorId: String? = null, date: Long = 0, createdAt: Long = 0) =
-        WeddingExpense(id, amount, date, WeddingItem.VENUE, vendorId, Spender.SHARED, null, createdAt)
+    private fun expense(
+        id: String,
+        amount: Long,
+        vendorId: String? = null,
+        date: Long = 0,
+        createdAt: Long = 0,
+        type: PaymentType? = null,
+    ) = WeddingExpense(id, amount, date, WeddingItem.VENUE, vendorId, Spender.SHARED, null, createdAt, type)
 
     private fun task(id: String, period: WeddingPeriod, createdAt: Long, completedAt: Long? = null) =
         WeddingTask(id, id, period, TodoAssignee.TOGETHER, completedAt != null, completedAt, createdAt)

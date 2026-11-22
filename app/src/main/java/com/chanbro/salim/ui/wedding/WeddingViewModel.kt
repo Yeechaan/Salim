@@ -3,6 +3,7 @@ package com.chanbro.salim.ui.wedding
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.chanbro.salim.domain.model.Connection
+import com.chanbro.salim.domain.model.PaymentType
 import com.chanbro.salim.domain.model.Spender
 import com.chanbro.salim.domain.model.SpenderNames
 import com.chanbro.salim.domain.model.TodoAssignee
@@ -48,6 +49,19 @@ data class WeddingUiState(
 ) {
     val enabled: Boolean get() = overview.settings.enabled
 }
+
+/** 업체 추가/수정 화면의 입력값. (wedding.md 12-8) */
+data class VendorDraft(
+    val name: String,
+    val item: WeddingItem,
+    val status: VendorStatus,
+    val phone: String,
+    val contractAmount: Long?,
+    val depositAmount: Long?,
+    val interimAmount: Long?,
+    val balanceDueMillis: Long?,
+    val memo: String,
+)
 
 /**
  * 결혼 준비 화면들(메인·지출 기록·업체 상세/추가)과 홈 카드가 함께 쓴다. (wedding.md)
@@ -111,6 +125,7 @@ class WeddingViewModel @Inject constructor(
         dateMillis: Long,
         item: WeddingItem,
         vendorId: String?,
+        paymentType: PaymentType?,
         spender: Spender,
         memo: String,
     ) = launch {
@@ -124,6 +139,8 @@ class WeddingViewModel @Inject constructor(
                 spender = if (connected) spender else Spender.ME,
                 memo = memo.trim().ifBlank { null },
                 createdAtMillis = baseline?.createdAtMillis ?: System.currentTimeMillis(),
+                // 업체를 "선택 안 함"으로 바꾸면 구분도 지운다 (wedding.md 12-5)
+                paymentType = paymentType.takeIf { vendorId != null },
             ),
             isNew = baseline == null,
         )
@@ -131,27 +148,23 @@ class WeddingViewModel @Inject constructor(
 
     fun deleteExpense(id: String) = launch { deleteExpenseUseCase(id) }
 
-    fun saveVendor(
-        baseline: WeddingVendor?,
-        name: String,
-        item: WeddingItem,
-        status: VendorStatus,
-        phone: String,
-        contractAmount: Long?,
-        balanceDueMillis: Long?,
-        memo: String,
-    ) = launch {
+    /** @param baseline 수정할 업체. 추가면 null — 등록 시각은 수정해도 원래 값을 유지한다. */
+    fun saveVendor(baseline: WeddingVendor?, draft: VendorDraft) = launch {
+        val contract = draft.contractAmount?.takeIf { it > 0 }
         saveVendorUseCase(
             WeddingVendor(
                 id = baseline?.id ?: UUID.randomUUID().toString(),
-                name = name.trim().take(WeddingVendor.NAME_MAX_LENGTH),
-                item = item,
-                status = status,
-                phone = phone.filter { it.isDigit() }.ifEmpty { null },
-                contractAmount = contractAmount,
-                balanceDueMillis = balanceDueMillis,
-                memo = memo.trim().ifBlank { null },
+                name = draft.name.trim().take(WeddingVendor.NAME_MAX_LENGTH),
+                item = draft.item,
+                status = draft.status,
+                phone = draft.phone.filter { it.isDigit() }.ifEmpty { null },
+                contractAmount = contract,
+                balanceDueMillis = draft.balanceDueMillis,
+                memo = draft.memo.trim().ifBlank { null },
                 createdAtMillis = baseline?.createdAtMillis ?: System.currentTimeMillis(),
+                // 계약 금액을 지우면 나눈 금액도 함께 비운다 (wedding.md 12-8)
+                depositAmount = draft.depositAmount?.takeIf { it > 0 && contract != null },
+                interimAmount = draft.interimAmount?.takeIf { it > 0 && contract != null },
             ),
             isNew = baseline == null,
         )

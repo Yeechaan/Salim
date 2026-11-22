@@ -2,6 +2,7 @@ package com.chanbro.salim.data.repository
 
 import android.util.Log
 import com.chanbro.salim.domain.model.DefaultWeddingTasks
+import com.chanbro.salim.domain.model.PaymentType
 import com.chanbro.salim.domain.model.Spender
 import com.chanbro.salim.domain.model.VendorStatus
 import com.chanbro.salim.domain.model.WeddingExpense
@@ -137,6 +138,8 @@ class FirestoreWeddingRepository @Inject constructor(
             "dateMillis" to expense.dateMillis,
             "item" to expense.item.name,
             "vendorId" to expense.vendorId,
+            // 업체 없는 지출에는 구분을 두지 않는다 (PRD 12-4)
+            "paymentType" to expense.paymentType?.name?.takeIf { expense.vendorId != null },
             "spenderType" to if (spenderUid == null) SPENDER_SHARED else SPENDER_PERSONAL,
             "spenderId" to spenderUid,
             "memo" to expense.memo,
@@ -162,6 +165,9 @@ class FirestoreWeddingRepository @Inject constructor(
             "status" to vendor.status.name,
             "phone" to vendor.phone,
             "contractAmount" to vendor.contractAmount,
+            // 잔금은 저장하지 않고 계산한다. 계약 금액이 없으면 나눈 금액도 의미가 없어 비운다.
+            "depositAmount" to vendor.depositAmount.takeIf { vendor.contractAmount != null },
+            "interimAmount" to vendor.interimAmount.takeIf { vendor.contractAmount != null },
             "balanceDueMillis" to vendor.balanceDueMillis,
             "memo" to vendor.memo,
             "createdAtMillis" to vendor.createdAtMillis,
@@ -174,8 +180,10 @@ class FirestoreWeddingRepository @Inject constructor(
         val scope = userScope.requireScope()
         val batch = scope.doc.firestore.batch()
         batch.delete(vendors(scope.doc).document(id))
-        // 지출은 남기고 업체 표시만 뗀다 (PRD 12-5). 배치가 끊겨도 읽는 쪽이 없는 업체를 "선택 안 함"으로 본다.
-        linkedExpenseIds.forEach { batch.update(expenses(scope.doc).document(it), "vendorId", null) }
+        // 지출은 남기고 업체 표시와 지출 구분만 뗀다 (PRD 12-5). 배치가 끊겨도 읽는 쪽이 없는 업체를 "선택 안 함"으로 본다.
+        linkedExpenseIds.forEach {
+            batch.update(expenses(scope.doc).document(it), mapOf("vendorId" to null, "paymentType" to null))
+        }
         batch.commit().await()
     }
 
@@ -246,6 +254,7 @@ class FirestoreWeddingRepository @Inject constructor(
             dateMillis = getLong("dateMillis") ?: 0L,
             item = WeddingItem.fromKey(getString("item")),
             vendorId = getString("vendorId"),
+            paymentType = PaymentType.fromKey(getString("paymentType")),
             spender = spender,
             memo = getString("memo"),
             createdAtMillis = getLong("createdAtMillis") ?: 0L,
@@ -261,6 +270,8 @@ class FirestoreWeddingRepository @Inject constructor(
             status = if (getString("status") == VendorStatus.CONTRACTED.name) VendorStatus.CONTRACTED else VendorStatus.CONSULTING,
             phone = getString("phone"),
             contractAmount = getLong("contractAmount"),
+            depositAmount = getLong("depositAmount"),
+            interimAmount = getLong("interimAmount"),
             balanceDueMillis = getLong("balanceDueMillis"),
             memo = getString("memo"),
             createdAtMillis = getLong("createdAtMillis") ?: 0L,

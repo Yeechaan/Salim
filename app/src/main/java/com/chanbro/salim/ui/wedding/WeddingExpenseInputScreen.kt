@@ -38,16 +38,19 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.chanbro.salim.R
 import com.chanbro.salim.core.ui.theme.SalimTokens
+import com.chanbro.salim.domain.model.PaymentType
 import com.chanbro.salim.domain.model.Spender
 import com.chanbro.salim.domain.model.WeddingExpense
 import com.chanbro.salim.domain.model.WeddingItem
 import com.chanbro.salim.domain.model.WeddingOverview
 import com.chanbro.salim.ui.common.AmountInput
 import com.chanbro.salim.ui.common.CategoryIconBadge
+import com.chanbro.salim.ui.common.ChipFlowRow
 import com.chanbro.salim.ui.common.DatePickerModal
 import com.chanbro.salim.ui.common.FieldDivider
 import com.chanbro.salim.ui.common.FieldRow
 import com.chanbro.salim.ui.common.SalimCard
+import com.chanbro.salim.ui.common.SalimChip
 import com.chanbro.salim.ui.common.SalimType
 import com.chanbro.salim.ui.common.SaveButton
 import com.chanbro.salim.ui.common.SubScreenTopBar
@@ -90,8 +93,8 @@ fun WeddingExpenseInputScreen(
         overview = overview,
         state = state,
         onClose = onClose,
-        onSave = { amount, date, item, vendor, spender, memo ->
-            viewModel.saveExpense(baseline, amount, date, item, vendor, spender, memo)
+        onSave = { amount, date, item, vendor, paymentType, spender, memo ->
+            viewModel.saveExpense(baseline, amount, date, item, vendor, paymentType, spender, memo)
             onDone()
         },
         onDelete = {
@@ -109,7 +112,7 @@ private fun WeddingExpenseContent(
     overview: WeddingOverview,
     state: WeddingUiState,
     onClose: () -> Unit,
-    onSave: (Long, Long, WeddingItem, String?, Spender, String) -> Unit,
+    onSave: (Long, Long, WeddingItem, String?, PaymentType?, Spender, String) -> Unit,
     onDelete: () -> Unit,
 ) {
     val isEdit = baseline != null
@@ -120,6 +123,10 @@ private fun WeddingExpenseContent(
     var vendorId by rememberSaveable {
         mutableStateOf(baseline?.let { overview.vendorOf(it)?.id } ?: prefillVendorId)
     }
+    // 기본은 고르지 않은 상태. 업체가 지워진 지출이면 구분도 없이 연다. (wedding.md 12-5)
+    var paymentType by rememberSaveable { mutableStateOf(baseline?.let(overview::paymentTypeOf)) }
+    // 구분을 골라 자동으로 채운 금액. 금액 칸이 이 값 그대로일 때만 다른 구분 금액으로 바꿔 채운다.
+    var prefilledDigits by rememberSaveable { mutableStateOf<String?>(null) }
     var spender by rememberSaveable { mutableStateOf(baseline?.spender ?: Spender.ME) }
     var memo by rememberSaveable { mutableStateOf(baseline?.memo.orEmpty()) }
     var showDatePicker by rememberSaveable { mutableStateOf(false) }
@@ -167,6 +174,31 @@ private fun WeddingExpenseContent(
                     vendor?.name ?: stringResource(R.string.wedding_expense_vendor_none),
                 ) { showVendorSheet = true }
                 FieldDivider()
+                // 업체를 골랐을 때만. 고른 칩을 다시 누르면 해제된다. (wedding.md 12-5)
+                if (vendor != null) {
+                    Column(modifier = Modifier.padding(vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(stringResource(R.string.wedding_payment_type), style = SalimType.bodyMd, color = SalimTokens.TextMuted)
+                        ChipFlowRow {
+                            PaymentType.entries.forEach { option ->
+                                SalimChip(
+                                    label = stringResource(option.labelRes()),
+                                    selected = option == paymentType,
+                                    onClick = {
+                                        paymentType = if (option == paymentType) null else option
+                                        // 업체에 그 구분 금액이 있으면 채운다 — 직접 적은 금액은 덮어쓰지 않는다 (wedding.md 12-5)
+                                        val part = vendor.amountOf(option)?.toString()
+                                        val untouched = amountDigits.isEmpty() || amountDigits == prefilledDigits
+                                        if (paymentType == option && part != null && untouched) {
+                                            amountDigits = part
+                                            prefilledDigits = part
+                                        }
+                                    },
+                                )
+                            }
+                        }
+                    }
+                    FieldDivider()
+                }
                 if (state.connected) {
                     Column(modifier = Modifier.padding(vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(stringResource(R.string.wedding_spender), style = SalimType.bodyMd, color = SalimTokens.TextMuted)
@@ -184,7 +216,12 @@ private fun WeddingExpenseContent(
         }
         SaveButton(
             enabled = amount > 0 && selectedItem != null,
-            onClick = { if (selectedItem != null) onSave(amount, dateMillis, selectedItem, vendor?.id, spender, memo) },
+            onClick = {
+                if (selectedItem != null) {
+                    // 업체가 없으면 구분도 저장하지 않는다 (업체를 "선택 안 함"으로 바꾼 경우).
+                    onSave(amount, dateMillis, selectedItem, vendor?.id, paymentType.takeIf { vendor != null }, spender, memo)
+                }
+            },
             label = stringResource(if (isEdit) R.string.common_edit_done else R.string.common_save),
         )
     }

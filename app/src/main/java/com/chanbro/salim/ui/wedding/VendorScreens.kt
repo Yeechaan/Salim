@@ -3,6 +3,11 @@ package com.chanbro.salim.ui.wedding
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,6 +45,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.chanbro.salim.R
+import com.chanbro.salim.ui.common.SalimTag
+import com.chanbro.salim.domain.model.PaymentType
 import com.chanbro.salim.core.ui.theme.SalimTokens
 import com.chanbro.salim.domain.model.VendorStatus
 import com.chanbro.salim.domain.model.WeddingItem
@@ -140,6 +147,14 @@ fun VendorDetailScreen(
                 vendor.contractAmount?.let {
                     LabelValueRow(stringResource(R.string.wedding_vendor_contract_amount), formatWon(it))
                 }
+                // 나눠 적었으면 구분별 금액. 그 구분으로 기록한 지출이 있으면 "완료" (wedding.md 12-7)
+                if (vendor.isSplit) {
+                    PaymentType.entries.forEach { type ->
+                        vendor.amountOf(type)?.let { amount ->
+                            SplitPartRow(type, amount, paid = overview.isPaid(vendor.id, type))
+                        }
+                    }
+                }
                 LabelValueRow(stringResource(R.string.wedding_vendor_spent), formatWon(spent))
                 overview.remainingFor(vendor)?.let { remaining ->
                     if (remaining >= 0) {
@@ -210,6 +225,23 @@ fun VendorDetailScreen(
     }
 }
 
+/** 계약 금액 아래 들여쓴 구분별 한 줄: 라벨 + (완료 태그) ... 금액. 계약 금액 줄보다 한 단계 가볍게. */
+@Composable
+private fun SplitPartRow(type: PaymentType, amount: Long, paid: Boolean) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 12.dp, top = 2.dp, bottom = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(stringResource(type.labelRes()), style = SalimType.bodySm, color = SalimTokens.TextMuted)
+        if (paid) SalimTag(stringResource(R.string.wedding_payment_done), filled = true)
+        Box(Modifier.weight(1f))
+        Text(formatWon(amount), style = SalimType.bodySm, color = SalimTokens.TextPrimary)
+    }
+}
+
 // ---------------------------------------------------------------------------
 // 업체 추가 / 수정 (wedding.md 12-8) — 입력 항목이 많아 시트 대신 전체 화면
 // ---------------------------------------------------------------------------
@@ -239,8 +271,8 @@ fun VendorInputScreen(
         baseline = baseline,
         linkedExpenseCount = baseline?.let { overview.expensesOf(it.id).size } ?: 0,
         onClose = onClose,
-        onSave = { name, item, status, phone, contract, due, memo ->
-            viewModel.saveVendor(baseline, name, item, status, phone, contract, due, memo)
+        onSave = { draft ->
+            viewModel.saveVendor(baseline, draft)
             onSaved()
         },
         onDelete = {
@@ -255,7 +287,7 @@ private fun VendorInputContent(
     baseline: WeddingVendor?,
     linkedExpenseCount: Int,
     onClose: () -> Unit,
-    onSave: (String, WeddingItem, VendorStatus, String, Long?, Long?, String) -> Unit,
+    onSave: (VendorDraft) -> Unit,
     onDelete: () -> Unit,
 ) {
     val isEdit = baseline != null
@@ -264,11 +296,17 @@ private fun VendorInputContent(
     var status by rememberSaveable { mutableStateOf(baseline?.status ?: VendorStatus.CONSULTING) }
     var phone by rememberSaveable { mutableStateOf(baseline?.phone.orEmpty()) }
     var contractDigits by rememberSaveable { mutableStateOf(baseline?.contractAmount?.toString().orEmpty()) }
+    var depositDigits by rememberSaveable { mutableStateOf(baseline?.depositAmount?.toString().orEmpty()) }
+    var interimDigits by rememberSaveable { mutableStateOf(baseline?.interimAmount?.toString().orEmpty()) }
     var balanceDue by rememberSaveable { mutableStateOf(baseline?.balanceDueMillis) }
     var memo by rememberSaveable { mutableStateOf(baseline?.memo.orEmpty()) }
     var showDatePicker by rememberSaveable { mutableStateOf(false) }
     var confirmingDelete by rememberSaveable { mutableStateOf(false) }
     val selectedItem = item
+    val contract = contractDigits.toLongOrNull()?.takeIf { it > 0 }
+    val deposit = depositDigits.toLongOrNull()?.takeIf { it > 0 }
+    val interim = interimDigits.toLongOrNull()?.takeIf { it > 0 }
+    val splitValid = WeddingVendor.isSplitValid(contract, deposit, interim)
 
     Column(modifier = Modifier.fillMaxSize().background(SalimTokens.Background)) {
         SubScreenTopBar(
@@ -335,6 +373,17 @@ private fun VendorInputContent(
                     keyboardType = KeyboardType.Number,
                     visualTransformation = ThousandsTransformation,
                 )
+                // 계약 금액을 적었을 때만 나눠 적기. 잔금은 나머지로 자동 계산 (wedding.md 12-8)
+                if (contract != null) {
+                    ContractSplitFields(
+                        deposit = depositDigits,
+                        interim = interimDigits,
+                        onDepositChange = { depositDigits = it },
+                        onInterimChange = { interimDigits = it },
+                        balance = if (deposit != null || interim != null) contract - (deposit ?: 0) - (interim ?: 0) else null,
+                        valid = splitValid,
+                    )
+                }
                 FieldDivider()
                 FieldRow(
                     stringResource(R.string.wedding_vendor_balance_due),
@@ -351,10 +400,10 @@ private fun VendorInputContent(
             }
         }
         SaveButton(
-            enabled = name.isNotBlank() && selectedItem != null,
+            enabled = name.isNotBlank() && selectedItem != null && splitValid,
             onClick = {
                 if (selectedItem != null) {
-                    onSave(name, selectedItem, status, phone, contractDigits.toLongOrNull()?.takeIf { it > 0 }, balanceDue, memo)
+                    onSave(VendorDraft(name, selectedItem, status, phone, contract, deposit, interim, balanceDue, memo))
                 }
             },
             label = stringResource(if (isEdit) R.string.common_edit_done else R.string.common_save),
@@ -390,5 +439,69 @@ private fun VendorInputContent(
                 stringResource(R.string.common_delete_confirm_body)
             },
         )
+    }
+}
+
+/**
+ * 계약 금액 아래 계약금 / 중도금 입력 + 잔금(자동 계산) 표시. 계약 금액에 딸린 값이라 들여쓴다.
+ * @param balance 계약금·중도금을 하나도 안 적었으면 null — 잔금 줄을 숨긴다.
+ */
+@Composable
+private fun ContractSplitFields(
+    deposit: String,
+    interim: String,
+    onDepositChange: (String) -> Unit,
+    onInterimChange: (String) -> Unit,
+    balance: Long?,
+    valid: Boolean,
+) {
+    Column(
+        modifier = Modifier.padding(start = 12.dp, bottom = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        SplitAmountRow(stringResource(R.string.wedding_payment_deposit), deposit, onDepositChange)
+        SplitAmountRow(stringResource(R.string.wedding_payment_interim), interim, onInterimChange)
+        when {
+            !valid -> Text(
+                stringResource(R.string.wedding_vendor_split_over),
+                style = SalimType.bodySm,
+                color = SalimTokens.Warning,
+            )
+            balance != null -> Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.wedding_payment_balance), style = SalimType.bodyMd, color = SalimTokens.TextMuted)
+                Text(
+                    stringResource(R.string.wedding_vendor_split_balance_hint),
+                    style = SalimType.bodySm,
+                    color = SalimTokens.TextMuted,
+                    modifier = Modifier.padding(start = 6.dp).weight(1f),
+                )
+                Text(formatWon(balance), style = SalimType.bodyLg, color = SalimTokens.TextPrimary)
+            }
+        }
+    }
+}
+
+/** 라벨 좌 / 금액 입력 우("원" 붙음). */
+@Composable
+private fun SplitAmountRow(label: String, digits: String, onDigitsChange: (String) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(label, style = SalimType.bodyMd, color = SalimTokens.TextMuted, modifier = Modifier.weight(1f))
+        BasicTextField(
+            value = digits,
+            onValueChange = { onDigitsChange(it.filter(Char::isDigit).take(10)) },
+            textStyle = SalimType.bodyLg.copy(color = SalimTokens.TextPrimary, textAlign = TextAlign.End),
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            visualTransformation = ThousandsTransformation,
+            cursorBrush = SolidColor(SalimTokens.Accent),
+            modifier = Modifier.width(160.dp),
+            decorationBox = { inner ->
+                Box(contentAlignment = Alignment.CenterEnd) {
+                    if (digits.isEmpty()) Text("0", style = SalimType.bodyLg, color = SalimTokens.TextMuted)
+                    inner()
+                }
+            },
+        )
+        Text("원", style = SalimType.bodyLg, color = SalimTokens.TextPrimary, modifier = Modifier.padding(start = 2.dp))
     }
 }

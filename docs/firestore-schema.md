@@ -264,6 +264,7 @@
 | dateMillis | Number | 지출 날짜 (UTC 자정 millis). 시간은 받지 않는다 (wedding.md 12-5) |
 | item | String | 웨딩 항목 enum 키 |
 | vendorId | String? | weddingVendors 문서 id. 없으면 업체 선택 안 함 |
+| paymentType | String? | 지출 구분 — `DEPOSIT`(계약금) / `INTERIM`(중도금) / `BALANCE`(잔금). 업체가 있는 지출에만 쓴다. 없으면 구분 없음, 모르는 값도 구분 없음으로 읽는다 |
 | spenderType | String | `PERSONAL` / `SHARED` — 가계부 `expenses`와 같음 |
 | spenderId | String (uid)? | 지출자 uid. `SHARED`면 null |
 | memo | String? | 메모 |
@@ -274,6 +275,8 @@
 - 예전 `spender` 폴백은 필요 없다 — 새 컬렉션이라 처음부터 `spenderType`/`spenderId`로 쓴다.
 - **지출 예정 금액은 저장하지 않는다.** 업체별 `contractAmount − 그 업체 vendorId를 가진 지출 합`을 클라이언트에서 계산한다 (wedding.md 12-7). 집계 필드를 두면 두 사람이 동시에 지출을 기록할 때 어긋난다.
 - `vendorId`가 가리키는 업체가 없으면(삭제됨, 다른 기기에서 배치 중간에 끊김 등) 업체 선택 안 함으로 읽는다.
+- **잔금 완료는 저장하지 않는다.** 그 업체 `vendorId`를 가진 지출 중 `paymentType == BALANCE`가 하나라도 있으면 잔금 완료로 보고, 그 업체의 지출 예정을 0으로 계산한다 (PRD 12-5). 업체 문서에 플래그를 두면 잔금 지출을 지우거나 구분을 바꿀 때 두 문서를 같이 맞춰야 한다.
+- `paymentType`은 필드 추가라 마이그레이션이 필요 없다 — 이전 지출은 모두 "구분 없음"으로 읽힌다. 이 필드를 모르는 구버전 앱이 지출을 수정하면 문서를 통째로 다시 쓰면서 구분이 지워진다 (두 사람 모두 업데이트 필요).
 
 ### {weddingVendors}/{vendorId}
 업체. (PRD 12-5)
@@ -285,12 +288,16 @@
 | status | String | `CONSULTING`(상담 중) / `CONTRACTED`(계약 완료) |
 | phone | String? | 연락처. **숫자만** 저장하고 하이픈은 표시할 때 붙인다 |
 | contractAmount | Long? | 계약 금액 (원) |
+| depositAmount | Long? | 계약금 (원). 계약 금액을 나눠 적었을 때만 |
+| interimAmount | Long? | 중도금 (원). 계약 금액을 나눠 적었을 때만 |
 | balanceDueMillis | Number? | 잔금일 (UTC 자정 millis) |
 | memo | String? | 메모 |
 | createdAtMillis | Number | 등록 시각. 그룹 안 정렬 키(등록순) |
 | updatedAtMillis | Number? | 수정 시각 |
 
-- **삭제는 한 배치로**: 업체 문서 delete + 그 업체 `vendorId`를 가진 지출들의 `vendorId`를 null로 update. 지출 목록은 이미 구독 중이라 추가 쿼리가 필요 없다. 배치 한도(500)는 한 업체의 지출 수로 넘을 일이 없다. 배치가 끊겨도 위 "없는 업체는 선택 안 함으로 읽는다" 규칙이 받쳐 준다.
+- **삭제는 한 배치로**: 업체 문서 delete + 그 업체 `vendorId`를 가진 지출들의 `vendorId`·`paymentType`을 null로 update (업체 없는 지출에는 구분을 두지 않는다). 지출 목록은 이미 구독 중이라 추가 쿼리가 필요 없다. 배치 한도(500)는 한 업체의 지출 수로 넘을 일이 없다. 배치가 끊겨도 위 "없는 업체는 선택 안 함으로 읽는다" 규칙이 받쳐 준다.
+- **잔금 금액은 저장하지 않는다** — `contractAmount − depositAmount − interimAmount`(빈 값은 0)로 계산한다. 셋을 다 저장하면 한쪽만 고쳤을 때 합이 어긋난다. 저장 전 `depositAmount + interimAmount ≤ contractAmount`를 클라이언트가 확인한다. 계약 금액을 지우면 두 필드도 함께 비운다.
+- 구분별 "완료"도 저장하지 않는다 — 그 업체 `vendorId` + 그 `paymentType`을 가진 지출이 있는지로 계산한다 (잔금 완료와 같은 방식).
 - 잔금일 알림은 1차 범위 밖이라 인덱스·필드를 따로 두지 않는다. 도입할 때 Cloud Functions 스케줄러가 `balanceDueMillis`로 조회한다.
 
 ## users/{userId}
