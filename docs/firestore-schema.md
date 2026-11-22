@@ -288,12 +288,16 @@
 | status | String | `CONSULTING`(상담 중) / `CONTRACTED`(계약 완료) |
 | phone | String? | 연락처. **숫자만** 저장하고 하이픈은 표시할 때 붙인다 |
 | contractAmount | Long? | 계약 금액 (원) |
+| depositAmount | Long? | 계약금 (원). 계약 금액을 나눠 적었을 때만 |
+| interimAmount | Long? | 중도금 (원). 계약 금액을 나눠 적었을 때만 |
 | balanceDueMillis | Number? | 잔금일 (UTC 자정 millis) |
 | memo | String? | 메모 |
 | createdAtMillis | Number | 등록 시각. 그룹 안 정렬 키(등록순) |
 | updatedAtMillis | Number? | 수정 시각 |
 
 - **삭제는 한 배치로**: 업체 문서 delete + 그 업체 `vendorId`를 가진 지출들의 `vendorId`·`paymentType`을 null로 update (업체 없는 지출에는 구분을 두지 않는다). 지출 목록은 이미 구독 중이라 추가 쿼리가 필요 없다. 배치 한도(500)는 한 업체의 지출 수로 넘을 일이 없다. 배치가 끊겨도 위 "없는 업체는 선택 안 함으로 읽는다" 규칙이 받쳐 준다.
+- **잔금 금액은 저장하지 않는다** — `contractAmount − depositAmount − interimAmount`(빈 값은 0)로 계산한다. 셋을 다 저장하면 한쪽만 고쳤을 때 합이 어긋난다. 저장 전 `depositAmount + interimAmount ≤ contractAmount`를 클라이언트가 확인한다. 계약 금액을 지우면 두 필드도 함께 비운다.
+- 구분별 "완료"도 저장하지 않는다 — 그 업체 `vendorId` + 그 `paymentType`을 가진 지출이 있는지로 계산한다 (잔금 완료와 같은 방식).
 - 잔금일 알림은 1차 범위 밖이라 인덱스·필드를 따로 두지 않는다. 도입할 때 Cloud Functions 스케줄러가 `balanceDueMillis`로 조회한다.
 
 ## users/{userId}
