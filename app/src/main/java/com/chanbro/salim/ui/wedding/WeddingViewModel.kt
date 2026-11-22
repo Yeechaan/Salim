@@ -3,6 +3,7 @@ package com.chanbro.salim.ui.wedding
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.chanbro.salim.domain.model.Connection
+import com.chanbro.salim.domain.model.PaymentType
 import com.chanbro.salim.domain.model.Spender
 import com.chanbro.salim.domain.model.SpenderNames
 import com.chanbro.salim.domain.model.TodoAssignee
@@ -111,6 +112,7 @@ class WeddingViewModel @Inject constructor(
         dateMillis: Long,
         item: WeddingItem,
         vendorId: String?,
+        paymentType: PaymentType?,
         spender: Spender,
         memo: String,
     ) = launch {
@@ -124,6 +126,8 @@ class WeddingViewModel @Inject constructor(
                 spender = if (connected) spender else Spender.ME,
                 memo = memo.trim().ifBlank { null },
                 createdAtMillis = baseline?.createdAtMillis ?: System.currentTimeMillis(),
+                // 업체를 "선택 안 함"으로 바꾸면 구분도 지운다 (wedding.md 12-5)
+                paymentType = paymentType.takeIf { vendorId != null },
             ),
             isNew = baseline == null,
         )

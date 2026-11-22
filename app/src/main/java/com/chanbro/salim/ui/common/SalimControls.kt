@@ -161,6 +161,29 @@ fun SalimProgressBar(
 }
 
 // ---------------------------------------------------------------------------
+// 상태 태그 (design.md 칩/태그 - 상태 태그) — 누를 수 없는 작은 pill
+// 쓰임: 업체 상태(계약 완료/상담 중), 웨딩 지출 구분(계약금/중도금/잔금)
+// ---------------------------------------------------------------------------
+
+/** @param filled 끝난/확정된 상태는 Coral 채움, 진행 중 상태는 옅은 태그. */
+@Composable
+fun SalimTag(label: String, filled: Boolean, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(percent = 50))
+            .background(if (filled) SalimTokens.Accent else SalimTokens.AccentSoft)
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+    ) {
+        Text(
+            label,
+            style = SalimType.labelSm.copy(fontWeight = FontWeight.Bold),
+            color = if (filled) Color.White else SalimTokens.Accent,
+            maxLines = 1,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
 // 원형 체크 (design.md 리스트 아이템 - 할 일). 할 일·결혼 준비 체크리스트 공용
 // ---------------------------------------------------------------------------
 

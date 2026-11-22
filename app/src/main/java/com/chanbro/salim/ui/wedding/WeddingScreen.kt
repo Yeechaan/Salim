@@ -57,6 +57,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.chanbro.salim.R
 import com.chanbro.salim.core.ui.theme.SalimTheme
 import com.chanbro.salim.core.ui.theme.SalimTokens
+import com.chanbro.salim.domain.model.PaymentType
 import com.chanbro.salim.domain.model.Spender
 import com.chanbro.salim.domain.model.Todo
 import com.chanbro.salim.domain.model.TodoAssignee
@@ -794,7 +795,19 @@ fun WeddingExpenseRow(
     ) {
         if (showItemIcon) CategoryIconBadge(icon = expense.item.icon(), colorKey = expense.item.colorKey(), size = 38.dp)
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(title, style = SalimType.bodyLg, color = SalimTokens.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    title,
+                    style = SalimType.bodyLg,
+                    color = SalimTokens.TextPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    // 제목이 길어도 구분 태그는 잘리지 않게 제목만 줄인다.
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                // 잔금을 치렀는지 지출 내역에서 바로 보이게 (PRD 12-4)
+                overview.paymentTypeOf(expense)?.let { PaymentTypeTag(it) }
+            }
             Text(meta, style = SalimType.bodySm, color = SalimTokens.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Text(formatWon(expense.amount), style = SalimType.bodyLg.copy(fontWeight = FontWeight.Medium), color = SalimTokens.TextPrimary)
@@ -894,7 +907,10 @@ private val previewOverview = WeddingOverview(
     vendors = listOf(
         WeddingVendor("v", "더채플 청담", WeddingItem.VENUE, VendorStatus.CONTRACTED, "0212345678", 12_000_000, null, null, 1),
     ),
-    expenses = listOf(WeddingExpense("e", 2_000_000, todayUtcMillis(), WeddingItem.VENUE, "v", Spender.SHARED, "계약금", 1)),
+    expenses = listOf(
+        WeddingExpense("e", 2_000_000, todayUtcMillis(), WeddingItem.VENUE, "v", Spender.SHARED, null, 1, PaymentType.DEPOSIT),
+        WeddingExpense("e2", 9_800_000, todayUtcMillis(), WeddingItem.VENUE, "v", Spender.SHARED, "본식 잔금", 2, PaymentType.BALANCE),
+    ),
 )
 
 @Preview(showBackground = true, showSystemUi = true)

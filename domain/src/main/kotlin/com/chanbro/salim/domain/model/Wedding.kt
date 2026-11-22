@@ -70,7 +70,22 @@ data class WeddingExpense(
     val spender: Spender,
     val memo: String?,
     val createdAtMillis: Long,
+    /** 지출 구분. 업체를 고른 지출에만 둔다. null이면 구분 없음. (PRD 12-4) */
+    val paymentType: PaymentType? = null,
 )
+
+/** 웨딩 지출 구분. 순서가 칩 순서다. */
+enum class PaymentType {
+    DEPOSIT,
+    INTERIM,
+    BALANCE,
+    ;
+
+    companion object {
+        /** 모르는 값은 구분 없음으로 읽는다. */
+        fun fromKey(key: String?): PaymentType? = entries.firstOrNull { it.name == key }
+    }
+}
 
 enum class VendorStatus {
     CONSULTING,
@@ -133,9 +148,25 @@ data class WeddingOverview(
     /** 계약 금액 − 기록한 지출. 계약 금액이 없으면 null. 음수면 초과. */
     fun remainingFor(vendor: WeddingVendor): Long? = vendor.contractAmount?.let { it - spentFor(vendor.id) }
 
-    /** 지출 예정에 더하는 금액 — 계약 완료 업체의 남은 금액만, 0 미만은 0. (wedding.md 12-7) */
-    fun plannedFor(vendor: WeddingVendor): Long =
-        if (vendor.status == VendorStatus.CONTRACTED) (remainingFor(vendor) ?: 0L).coerceAtLeast(0L) else 0L
+    /** 잔금으로 기록한 지출이 있는 업체. 다 치른 것으로 본다. (PRD 12-5) */
+    private val balancePaidVendorIds: Set<String> by lazy {
+        expenses.filter { it.paymentType == PaymentType.BALANCE }.mapNotNull { it.vendorId }.toSet()
+    }
+
+    fun isBalancePaid(vendorId: String): Boolean = vendorId in balancePaidVendorIds
+
+    /** 화면에 보일 지출 구분. 업체가 없는(지워진) 지출에는 구분을 두지 않는다. */
+    fun paymentTypeOf(expense: WeddingExpense): PaymentType? = expense.paymentType?.takeIf { vendorOf(expense) != null }
+
+    /**
+     * 지출 예정에 더하는 금액 — 계약 완료 업체의 남은 금액만, 0 미만은 0. (wedding.md 12-7)
+     * 잔금을 기록한 업체는 기록한 합이 계약 금액과 달라도(할인 등) 0으로 본다.
+     */
+    fun plannedFor(vendor: WeddingVendor): Long = when {
+        vendor.status != VendorStatus.CONTRACTED -> 0L
+        isBalancePaid(vendor.id) -> 0L
+        else -> (remainingFor(vendor) ?: 0L).coerceAtLeast(0L)
+    }
 
     val spentTotal: Long get() = expenses.sumOf { it.amount }
     val plannedTotal: Long get() = vendors.sumOf { plannedFor(it) }

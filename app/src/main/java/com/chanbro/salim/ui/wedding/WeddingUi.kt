@@ -44,6 +44,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.chanbro.salim.R
 import com.chanbro.salim.core.ui.theme.SalimTokens
+import com.chanbro.salim.domain.model.PaymentType
 import com.chanbro.salim.domain.model.Spender
 import com.chanbro.salim.domain.model.SpenderNames
 import com.chanbro.salim.domain.model.TodoAssignee
@@ -53,6 +54,7 @@ import com.chanbro.salim.domain.model.WeddingPeriod
 import com.chanbro.salim.ui.common.CategoryChip
 import com.chanbro.salim.ui.common.ChipFlowRow
 import com.chanbro.salim.ui.common.SalimChip
+import com.chanbro.salim.ui.common.SalimTag
 import com.chanbro.salim.ui.common.SalimType
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -102,6 +104,13 @@ fun WeddingPeriod.labelRes(): Int = when (this) {
 }
 
 @StringRes
+fun PaymentType.labelRes(): Int = when (this) {
+    PaymentType.DEPOSIT -> R.string.wedding_payment_deposit
+    PaymentType.INTERIM -> R.string.wedding_payment_interim
+    PaymentType.BALANCE -> R.string.wedding_payment_balance
+}
+
+@StringRes
 fun VendorStatus.labelRes(): Int = when (this) {
     VendorStatus.CONSULTING -> R.string.wedding_vendor_status_consulting
     VendorStatus.CONTRACTED -> R.string.wedding_vendor_status_contracted
@@ -140,23 +149,15 @@ fun SpenderChips(names: SpenderNames, selected: Spender, onSelect: (Spender) -> 
     }
 }
 
-/** 업체 상태 칩 (계약 완료: Coral 채움 / 상담 중: 옅은 칩). 목록 표시용 — 누를 수 없다. */
+/** 업체 상태 태그 (계약 완료: 채움 / 상담 중: 옅은). */
 @Composable
-fun VendorStatusTag(status: VendorStatus) {
-    val contracted = status == VendorStatus.CONTRACTED
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(percent = 50))
-            .background(if (contracted) SalimTokens.Accent else SalimTokens.AccentSoft)
-            .padding(horizontal = 8.dp, vertical = 3.dp),
-    ) {
-        Text(
-            stringResource(status.labelRes()),
-            style = SalimType.labelSm.copy(fontWeight = FontWeight.Bold),
-            color = if (contracted) Color.White else SalimTokens.Accent,
-        )
-    }
-}
+fun VendorStatusTag(status: VendorStatus) =
+    SalimTag(stringResource(status.labelRes()), filled = status == VendorStatus.CONTRACTED)
+
+/** 웨딩 지출 구분 태그. 잔금만 채움 — 다 치렀다는 표시. (wedding.md 12-4) */
+@Composable
+fun PaymentTypeTag(type: PaymentType, modifier: Modifier = Modifier) =
+    SalimTag(stringResource(type.labelRes()), filled = type == PaymentType.BALANCE, modifier = modifier)
 
 /** 카드 안 라벨 좌 / 값 우 한 줄 (업체 상세·예산 카드). */
 @Composable

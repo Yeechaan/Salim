@@ -262,6 +262,10 @@
     <string name="wedding_expense_vendor">업체</string>
     <string name="wedding_expense_vendor_none">선택 안 함</string>
     <string name="wedding_expense_vendor_empty">등록된 업체가 없어요</string>
+    <string name="wedding_payment_type">구분</string>
+    <string name="wedding_payment_deposit">계약금</string>
+    <string name="wedding_payment_interim">중도금</string>
+    <string name="wedding_payment_balance">잔금</string>
     <string name="wedding_date">날짜</string>
     <string name="wedding_spender">지출자</string>
     <string name="wedding_memo">메모</string>
