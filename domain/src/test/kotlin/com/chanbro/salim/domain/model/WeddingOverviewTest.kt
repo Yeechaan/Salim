@@ -84,6 +84,48 @@ class WeddingOverviewTest {
     }
 
     @Test
+    fun `잔금은 계약 금액에서 계약금·중도금을 뺀 나머지다`() {
+        val split = vendor("hall", VendorStatus.CONTRACTED, contract = 5_000_000)
+            .copy(depositAmount = 1_000_000, interimAmount = 2_000_000)
+
+        assertTrue(split.isSplit)
+        assertEquals(1_000_000L, split.amountOf(PaymentType.DEPOSIT))
+        assertEquals(2_000_000L, split.amountOf(PaymentType.INTERIM))
+        assertEquals(2_000_000L, split.amountOf(PaymentType.BALANCE))
+    }
+
+    @Test
+    fun `나눠 적지 않은 업체는 구분별 금액이 없다`() {
+        val plain = vendor("hall", VendorStatus.CONTRACTED, contract = 5_000_000)
+        val onlyDeposit = plain.copy(depositAmount = 1_000_000)
+
+        assertFalse(plain.isSplit)
+        assertNull(plain.amountOf(PaymentType.BALANCE))
+        // 중도금을 비워 두면 중도금은 없고 잔금은 나머지 전부
+        assertNull(onlyDeposit.amountOf(PaymentType.INTERIM))
+        assertEquals(4_000_000L, onlyDeposit.amountOf(PaymentType.BALANCE))
+    }
+
+    @Test
+    fun `계약금과 중도금 합이 계약 금액을 넘으면 저장할 수 없다`() {
+        assertTrue(WeddingVendor.isSplitValid(5_000_000, 1_000_000, 4_000_000))
+        assertFalse(WeddingVendor.isSplitValid(5_000_000, 3_000_000, 3_000_000))
+        assertTrue(WeddingVendor.isSplitValid(null, null, null))
+    }
+
+    @Test
+    fun `구분별 완료는 그 구분으로 기록한 지출이 있는지로 본다`() {
+        val overview = WeddingOverview(
+            vendors = listOf(vendor("hall", VendorStatus.CONTRACTED, contract = 5_000_000)),
+            expenses = listOf(expense("d", 900_000, vendorId = "hall", type = PaymentType.DEPOSIT)),
+        )
+
+        assertTrue(overview.isPaid("hall", PaymentType.DEPOSIT))
+        assertFalse(overview.isPaid("hall", PaymentType.INTERIM))
+        assertFalse(overview.isBalancePaid("hall"))
+    }
+
+    @Test
     fun `모르는 구분 값은 구분 없음으로 읽는다`() {
         assertNull(PaymentType.fromKey("REFUND"))
         assertNull(PaymentType.fromKey(null))

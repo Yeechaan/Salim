@@ -125,6 +125,8 @@ private fun WeddingExpenseContent(
     }
     // 기본은 고르지 않은 상태. 업체가 지워진 지출이면 구분도 없이 연다. (wedding.md 12-5)
     var paymentType by rememberSaveable { mutableStateOf(baseline?.let(overview::paymentTypeOf)) }
+    // 구분을 골라 자동으로 채운 금액. 금액 칸이 이 값 그대로일 때만 다른 구분 금액으로 바꿔 채운다.
+    var prefilledDigits by rememberSaveable { mutableStateOf<String?>(null) }
     var spender by rememberSaveable { mutableStateOf(baseline?.spender ?: Spender.ME) }
     var memo by rememberSaveable { mutableStateOf(baseline?.memo.orEmpty()) }
     var showDatePicker by rememberSaveable { mutableStateOf(false) }
@@ -181,7 +183,16 @@ private fun WeddingExpenseContent(
                                 SalimChip(
                                     label = stringResource(option.labelRes()),
                                     selected = option == paymentType,
-                                    onClick = { paymentType = if (option == paymentType) null else option },
+                                    onClick = {
+                                        paymentType = if (option == paymentType) null else option
+                                        // 업체에 그 구분 금액이 있으면 채운다 — 직접 적은 금액은 덮어쓰지 않는다 (wedding.md 12-5)
+                                        val part = vendor.amountOf(option)?.toString()
+                                        val untouched = amountDigits.isEmpty() || amountDigits == prefilledDigits
+                                        if (paymentType == option && part != null && untouched) {
+                                            amountDigits = part
+                                            prefilledDigits = part
+                                        }
+                                    },
                                 )
                             }
                         }

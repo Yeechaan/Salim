@@ -165,6 +165,9 @@ class FirestoreWeddingRepository @Inject constructor(
             "status" to vendor.status.name,
             "phone" to vendor.phone,
             "contractAmount" to vendor.contractAmount,
+            // 잔금은 저장하지 않고 계산한다. 계약 금액이 없으면 나눈 금액도 의미가 없어 비운다.
+            "depositAmount" to vendor.depositAmount.takeIf { vendor.contractAmount != null },
+            "interimAmount" to vendor.interimAmount.takeIf { vendor.contractAmount != null },
             "balanceDueMillis" to vendor.balanceDueMillis,
             "memo" to vendor.memo,
             "createdAtMillis" to vendor.createdAtMillis,
@@ -267,6 +270,8 @@ class FirestoreWeddingRepository @Inject constructor(
             status = if (getString("status") == VendorStatus.CONTRACTED.name) VendorStatus.CONTRACTED else VendorStatus.CONSULTING,
             phone = getString("phone"),
             contractAmount = getLong("contractAmount"),
+            depositAmount = getLong("depositAmount"),
+            interimAmount = getLong("interimAmount"),
             balanceDueMillis = getLong("balanceDueMillis"),
             memo = getString("memo"),
             createdAtMillis = getLong("createdAtMillis") ?: 0L,

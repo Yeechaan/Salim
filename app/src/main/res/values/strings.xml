@@ -266,6 +266,9 @@
     <string name="wedding_payment_deposit">계약금</string>
     <string name="wedding_payment_interim">중도금</string>
     <string name="wedding_payment_balance">잔금</string>
+    <string name="wedding_payment_done">완료</string>
+    <string name="wedding_vendor_split_balance_hint">(나머지)</string>
+    <string name="wedding_vendor_split_over">계약금과 중도금이 계약 금액보다 많아요</string>
     <string name="wedding_date">날짜</string>
     <string name="wedding_spender">지출자</string>
     <string name="wedding_memo">메모</string>
